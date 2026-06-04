@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
@@ -73,7 +73,7 @@
     <div class="overlay">
       <div class="header">
         <span id="rank-name">Chargement API...</span>
-        <span id="current-mmr">--- MMR</span>
+        <span id="current-mmr">--- MMR <span id="delta-mmr"></span></span>
       </div>
       <div class="stats">
         <div class="box">
@@ -97,7 +97,10 @@
         losses: 0,
         startMMR: null,
         currentMMR: 0,
+        deltaMMR: 0,
         rank: "Unranked",
+        matchAlreadyCounted: false,
+        myCurrentTeamNum: null, // Stocke l'équipe actuelle (0 ou 1)
       };
 
       const ui = {
@@ -105,6 +108,7 @@
         losses: document.getElementById("losses"),
         mmr: document.getElementById("current-mmr"),
         delta: document.getElementById("mmr-change"),
+        deltaMMR: document.getElementById("delta-mmr"),
         rank: document.getElementById("rank-name"),
       };
 
@@ -113,6 +117,10 @@
         ui.losses.textContent = state.losses;
         ui.mmr.textContent = `${state.currentMMR} MMR`;
         ui.rank.textContent = state.rank;
+        ui.deltaMMR.textContent =
+          state.deltaMMR !== 0
+            ? `(${state.deltaMMR > 0 ? `+${state.deltaMMR}` : state.deltaMMR})`
+            : "";
 
         if (state.startMMR !== null) {
           const diff = state.currentMMR - state.startMMR;
@@ -124,20 +132,43 @@
 
       // --- 1. CONNEXION À L'API NATIVE DE ROCKET LEAGUE ---
       function connectRLNative() {
-        const ws = new WebSocket("ws://127.0.0.1:49123");
+        // On se connecte à notre propre serveur Node, et plus au jeu directement !
+        const ws = new WebSocket("ws://localhost:3001");
 
         ws.onopen = () =>
           console.log("✅ Connecté à l'API Native de Rocket League");
 
         ws.onmessage = (event) => {
           const payload = JSON.parse(event.data);
+          const gameData = JSON.parse(payload.Data);
+          // Réinitialiser le verrou quand on rentre dans une nouvelle partie
+          if (
+            payload.Event === "MatchCreated" ||
+            payload.Event === "MatchDestroyed"
+          ) {
+            state.matchAlreadyCounted = false;
+          }
 
+          if (payload.Event === "UpdateState" && typeof gameData === "object") {
+            const myName = "Spyx08";
+
+            if (gameData.Players && Array.isArray(gameData.Players)) {
+              const myPlayerObj = gameData.Players.find(
+                (p) => p.Name === myName,
+              );
+
+              // Étape 1 : On mémorise l'équipe (0 ou 1) pendant que l'on joue
+              if (myPlayerObj && myPlayerObj.TeamNum !== undefined) {
+                state.myCurrentTeamNum = myPlayerObj.TeamNum;
+              }
+            }
+          }
           // L'événement dépend de la structure de l'API Native.
           // Généralement, un "MatchEnded" ou "Goal" est émis.
           if (payload.Event === "MatchEnded") {
             // Logique simplifiée : vérifier si le joueur local a gagné
-            const isWinner =
-              payload.Data.Winner === payload.Data.LocalPlayerTeam;
+            const isWinner = state.myCurrentTeamNum == gameData.WinnerTeamNum;
+
             if (isWinner) state.wins++;
             else state.losses++;
 
@@ -161,7 +192,7 @@
         try {
           // On interroge désormais ton propre serveur local
           const response = await fetch(
-            `http://localhost:3000/api/mmr/${PLATFORM}/${USERNAME}`
+            `http://localhost:3000/api/mmr/${PLATFORM}/${USERNAME}`,
           );
 
           if (!response.ok)
@@ -172,6 +203,8 @@
           // Le proxy Node a déjà fait le tri, on reçoit juste "mmr" et "rank"
           const newMMR = data.mmr;
           const newRank = data.rank;
+
+          state.deltaMMR = newMMR - state.currentMMR;
 
           // Mise à jour du state
           if (state.startMMR === null) state.startMMR = newMMR;
@@ -186,7 +219,7 @@
 
       // Initialisation
       connectRLNative();
-      await fetchExternalMMR(); // Premier appel pour initialiser l'overlay au lancement
+      fetchExternalMMR(); // Premier appel pour initialiser l'overlay au lancement
     </script>
   </body>
 </html>
