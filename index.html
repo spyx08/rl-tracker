@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>RL Native Overlay</title>
+    <style>
+      :root {
+        --bg-color: rgba(15, 23, 42, 0.9);
+        --text-main: #f8fafc;
+        --accent-neutral: #3b82f6;
+        --win: #10b981;
+        --loss: #ef4444;
+        --font-family: "Segoe UI", Roboto, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        font-family: var(--font-family);
+        color: var(--text-main);
+        background: transparent;
+        overflow: hidden;
+      }
+
+      .overlay {
+        background: var(--bg-color);
+        border-radius: 12px;
+        padding: 16px 24px;
+        display: inline-flex;
+        flex-direction: column;
+        gap: 16px;
+        border-left: 4px solid var(--accent-neutral);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 8px;
+        font-size: 1.2rem;
+        font-weight: bold;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      .box {
+        display: flex;
+        flex-direction: column;
+      }
+      .label {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+      }
+      .val {
+        font-size: 1.4rem;
+        font-weight: bold;
+        margin-top: 4px;
+      }
+
+      .text-win {
+        color: var(--win);
+      }
+      .text-loss {
+        color: var(--loss);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="overlay">
+      <div class="header">
+        <span id="rank-name">Chargement API...</span>
+        <span id="current-mmr">--- MMR</span>
+      </div>
+      <div class="stats">
+        <div class="box">
+          <span class="label">Session (V - D)</span>
+          <span class="val">
+            <span id="wins" class="text-win">0</span> -
+            <span id="losses" class="text-loss">0</span>
+          </span>
+        </div>
+        <div class="box">
+          <span class="label">Delta MMR</span>
+          <span class="val" id="mmr-change">±0</span>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // State de la session
+      const state = {
+        wins: 0,
+        losses: 0,
+        startMMR: null,
+        currentMMR: 0,
+        rank: "Unranked",
+      };
+
+      const ui = {
+        wins: document.getElementById("wins"),
+        losses: document.getElementById("losses"),
+        mmr: document.getElementById("current-mmr"),
+        delta: document.getElementById("mmr-change"),
+        rank: document.getElementById("rank-name"),
+      };
+
+      function updateUI() {
+        ui.wins.textContent = state.wins;
+        ui.losses.textContent = state.losses;
+        ui.mmr.textContent = `${state.currentMMR} MMR`;
+        ui.rank.textContent = state.rank;
+
+        if (state.startMMR !== null) {
+          const diff = state.currentMMR - state.startMMR;
+          ui.delta.textContent = diff > 0 ? `+${diff}` : diff;
+          ui.delta.className =
+            "val " + (diff > 0 ? "text-win" : diff < 0 ? "text-loss" : "");
+        }
+      }
+
+      // --- 1. CONNEXION À L'API NATIVE DE ROCKET LEAGUE ---
+      function connectRLNative() {
+        const ws = new WebSocket("ws://127.0.0.1:49123");
+
+        ws.onopen = () =>
+          console.log("✅ Connecté à l'API Native de Rocket League");
+
+        ws.onmessage = (event) => {
+          const payload = JSON.parse(event.data);
+
+          // L'événement dépend de la structure de l'API Native.
+          // Généralement, un "MatchEnded" ou "Goal" est émis.
+          if (payload.Event === "MatchEnded") {
+            // Logique simplifiée : vérifier si le joueur local a gagné
+            const isWinner =
+              payload.Data.Winner === payload.Data.LocalPlayerTeam;
+            if (isWinner) state.wins++;
+            else state.losses++;
+
+            updateUI();
+
+            // On déclenche la récupération du MMR externe à la fin du match
+            fetchExternalMMR();
+          }
+        };
+
+        ws.onclose = () => {
+          console.log("❌ Déconnecté. Reconnexion dans 5s...");
+          setTimeout(connectRLNative, 5000);
+        };
+      }
+      // Configuration de ton profil
+      const PLATFORM = "epic"; // 'steam', 'epic', 'psn', 'xbl'
+      const USERNAME = "TonPseudoIci"; // Remplace par ton pseudo exact
+
+      // L'URL cible TRN
+      const targetUrl = `https://api.tracker.gg/api/v2/rocket-league/standard/profile/${PLATFORM}/${encodeURIComponent(
+        USERNAME
+      )}`;
+
+      // L'URL finale avec le Proxy CORS pour contourner le blocage du navigateur
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+
+      // Fonction pour récupérer les données
+      async function fetchTRNData() {
+        try {
+          console.log("Appel à l'API TRN en cours...");
+
+          // TRN bloque parfois les requêtes sans User-Agent classique, on simule un minimum
+          const response = await fetch(proxyUrl, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+            },
+          });
+
+          if (!response.ok) {
+            if (response.status === 429)
+              throw new Error("Rate limit atteint (trop de requêtes).");
+            if (response.status === 404) throw new Error("Joueur introuvable.");
+            throw new Error(`Erreur HTTP: ${response.status}`);
+          }
+
+          const jsonData = await response.json();
+
+          // --- EXTRACTION DU MMR ---
+          // Les données utiles sont dans data.data.segments
+          const segments = jsonData.data.segments;
+
+          // On cherche le segment qui correspond au mode classé 2v2
+          const doublesStats = segments.find(
+            (segment) => segment.metadata.name === "Ranked Doubles 2v2"
+          );
+
+          if (!doublesStats) {
+            throw new Error("Données 2v2 introuvables pour ce joueur.");
+          }
+
+          // On extrait le MMR exact et le nom du rang
+          const currentMMR = doublesStats.stats.rating.value;
+          const currentRank = doublesStats.stats.tier.metadata.name; // Ex: "Champion II"
+          const currentDivision = doublesStats.stats.division.metadata.name; // Ex: "Division III"
+
+          console.log(
+            `Données récupérées : ${currentRank} ${currentDivision} | ${currentMMR} MMR`
+          );
+
+          return {
+            mmr: currentMMR,
+            rank: `${currentRank} - ${currentDivision}`,
+          };
+        } catch (error) {
+          console.error("Échec de la récupération TRN :", error.message);
+          return null;
+        }
+      }
+
+      // Exemple d'utilisation dans ton workflow :
+      // Tu appelleras cette fonction uniquement quand l'API Native RL te dira "MatchEnded"
+
+      fetchTRNData().then((data) => {
+        if (data) {
+          // Mettre à jour ton state et ton DOM ici
+          state.currentMMR = data.mmr;
+          state.rank = data.rank;
+          updateUI();
+        }
+      });
+
+      // Initialisation
+      connectRLNative();
+      fetchExternalMMR(); // Premier appel pour initialiser l'overlay au lancement
+    </script>
+  </body>
+</html>
