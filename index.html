@@ -2,14 +2,17 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <title>RL Native Overlay</title>
+    <title>RL Native Overlay - Pro Dashboard Live</title>
     <style>
       :root {
         --bg-color: rgba(15, 23, 42, 0.9);
+        --bg-panel: rgba(30, 41, 59, 0.95);
         --text-main: #f8fafc;
+        --text-muted: #94a3b8;
         --accent-neutral: #3b82f6;
         --win: #10b981;
         --loss: #ef4444;
+        --gold: #fbbf24;
         --font-family: "Segoe UI", Roboto, sans-serif;
       }
 
@@ -22,11 +25,19 @@
         overflow: hidden;
       }
 
+      .overlay-wrapper {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 8px;
+        position: relative;
+        min-width: 480px; /* Élargi un peu pour la 4ème colonne */
+      }
+
       .overlay {
         background: var(--bg-color);
         border-radius: 12px;
         padding: 16px 24px;
-        display: inline-flex;
+        display: flex;
         flex-direction: column;
         gap: 16px;
         border-left: 4px solid var(--accent-neutral);
@@ -36,11 +47,14 @@
       .header {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         padding-bottom: 8px;
         font-size: 1.2rem;
         font-weight: bold;
+        gap: 20px;
       }
+
       .stats {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -52,46 +66,276 @@
       }
       .label {
         font-size: 0.8rem;
-        color: #94a3b8;
+        color: var(--text-muted);
         text-transform: uppercase;
+        text-align: center;
       }
       .val {
         font-size: 1.4rem;
         font-weight: bold;
         margin-top: 4px;
       }
-
       .text-win {
         color: var(--win);
       }
       .text-loss {
         color: var(--loss);
       }
+      .text-gold {
+        color: var(--gold);
+      }
+
+      .controls {
+        display: flex;
+        gap: 8px;
+      }
+
+      .toggle-btn {
+        background: var(--bg-panel);
+        color: var(--text-muted);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition:
+          color 0.2s,
+          background 0.2s;
+        flex: 1;
+      }
+      .toggle-btn:hover {
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .panel {
+        background: var(--bg-panel);
+        border-radius: 12px;
+        padding: 16px 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        max-height: 300px;
+        opacity: 1;
+        overflow: hidden;
+        transition:
+          max-height 0.4s ease,
+          opacity 0.3s ease,
+          padding 0.4s ease,
+          margin 0.4s ease;
+      }
+
+      .panel.hidden {
+        max-height: 0;
+        opacity: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-top: -8px;
+        pointer-events: none;
+        border: none;
+      }
+
+      /* Passage en 4 colonnes pour le dashboard de session */
+      .extended-dashboard {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        border-left: 4px solid var(--text-muted);
+      }
+      .ext-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 8px;
+        border-radius: 8px;
+      }
+      .ext-val {
+        font-size: 1.2rem;
+        font-weight: bold;
+      }
+      .ext-sub {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      .live-game-panel {
+        border-left: 4px solid var(--accent-neutral);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .live-teams-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .team-col {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 10px;
+        border-radius: 8px;
+      }
+      .team-name {
+        font-size: 0.9rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 4px;
+        margin-bottom: 4px;
+      }
+      .player-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+      }
+      .p-name {
+        font-weight: bold;
+      }
+      .p-stats {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+      }
+
+      .announcer {
+        position: absolute;
+        top: -60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, var(--accent-neutral), #1e40af);
+        padding: 8px 20px;
+        border-radius: 24px;
+        font-weight: bold;
+        font-size: 1.2rem;
+        white-space: nowrap;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .announcer.show-goal {
+        animation: popInAndOut 4s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+          forwards;
+      }
+      .announcer.show-win {
+        background: linear-gradient(135deg, var(--win), #047857);
+        animation: popInAndOut 5s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+          forwards;
+      }
+
+      @keyframes popInAndOut {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, 20px) scale(0.8);
+        }
+        15% {
+          opacity: 1;
+          transform: translate(-50%, 0) scale(1.1);
+        }
+        25% {
+          transform: translate(-50%, 0) scale(1);
+        }
+        80% {
+          opacity: 1;
+          transform: translate(-50%, 0) scale(1);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -20px) scale(0.8);
+        }
+      }
     </style>
   </head>
   <body>
-    <div class="overlay">
-      <div class="header">
-        <span id="rank-name">Chargement API...</span>
-        <span id="current-mmr">--- MMR <span id="delta-mmr"></span></span>
-      </div>
-      <div class="stats">
-        <div class="box">
-          <span class="label">Session (V - D)</span>
-          <span class="val">
-            <span id="wins" class="text-win">0</span> -
-            <span id="losses" class="text-loss">0</span>
-          </span>
+    <div id="announcer" class="announcer"></div>
+
+    <div class="overlay-wrapper">
+      <div class="overlay">
+        <div class="header">
+          <span id="rank-name">Chargement API...</span>
+          <span id="current-mmr"
+            >--- MMR
+            <span
+              id="delta-mmr"
+              style="font-size: 0.8em; color: var(--text-muted)"
+            ></span
+          ></span>
         </div>
-        <div class="box">
-          <span class="label">Delta MMR</span>
-          <span class="val" id="mmr-change">±0</span>
+        <div class="stats">
+          <div class="box">
+            <span class="label" style="text-align: left">Session (V - D)</span>
+            <span class="val">
+              <span id="wins" class="text-win">0</span> -
+              <span id="losses" class="text-loss">0</span>
+            </span>
+          </div>
+          <div class="box">
+            <span class="label" style="text-align: left">Delta MMR</span>
+            <span class="val" id="mmr-change">±0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button
+          id="btn-session"
+          class="toggle-btn"
+          onclick="togglePanel('session')"
+        >
+          Stats Session ▼
+        </button>
+        <button id="btn-live" class="toggle-btn" onclick="togglePanel('live')">
+          Game en cours ▼
+        </button>
+      </div>
+
+      <div id="panel-session" class="panel extended-dashboard hidden">
+        <div class="ext-box">
+          <span class="label">Buts</span>
+          <span class="ext-val" id="tot-goals">0</span>
+          <span class="ext-sub" id="avg-goals">0.0 / match</span>
+        </div>
+        <div class="ext-box">
+          <span class="label">Passes</span>
+          <span class="ext-val" id="tot-assists">0</span>
+          <span class="ext-sub" id="avg-assists">0.0 / match</span>
+        </div>
+        <div class="ext-box">
+          <span class="label">Arrêts</span>
+          <span class="ext-val" id="tot-saves">0</span>
+          <span class="ext-sub" id="avg-saves">0.0 / match</span>
+        </div>
+        <div class="ext-box">
+          <span class="label">Démos Subies</span>
+          <span class="ext-val text-loss" id="tot-demolished">0</span>
+          <span class="ext-sub" id="avg-demolished">0.0 / match</span>
+        </div>
+        <div class="ext-box" style="grid-column: span 4">
+          <span class="label">Titres de MVP</span>
+          <span class="ext-val text-gold" id="tot-mvp">0</span>
+        </div>
+      </div>
+
+      <div id="panel-live" class="panel live-game-panel hidden">
+        <div class="label" style="text-align: center">Scoreboard Direct</div>
+        <div id="live-teams" class="live-teams-container">
+          <div
+            style="
+              grid-column: span 2;
+              text-align: center;
+              color: var(--text-muted);
+              font-size: 0.85rem;
+            "
+          >
+            En attente de joueurs...
+          </div>
         </div>
       </div>
     </div>
 
     <script>
-      // State de la session
       const state = {
         wins: 0,
         losses: 0,
@@ -100,7 +344,17 @@
         deltaMMR: 0,
         rank: "Unranked",
         matchAlreadyCounted: false,
-        myCurrentTeamNum: null, // Stocke l'équipe actuelle (0 ou 1)
+        myCurrentTeamNum: null,
+
+        // Ajout de la variable pour les démolitions
+        totalMatches: 0,
+        totalGoals: 0,
+        totalAssists: 0,
+        totalSaves: 0,
+        totalMVPs: 0,
+        totalDemolished: 0,
+        lastPlayersState: [],
+        lastLiveHTML: "",
       };
 
       const ui = {
@@ -110,7 +364,49 @@
         delta: document.getElementById("mmr-change"),
         deltaMMR: document.getElementById("delta-mmr"),
         rank: document.getElementById("rank-name"),
+        announcer: document.getElementById("announcer"),
+
+        totGoals: document.getElementById("tot-goals"),
+        avgGoals: document.getElementById("avg-goals"),
+        totAssists: document.getElementById("tot-assists"),
+        avgAssists: document.getElementById("avg-assists"),
+        totSaves: document.getElementById("tot-saves"),
+        avgSaves: document.getElementById("avg-saves"),
+        totDemolished: document.getElementById("tot-demolished"),
+        avgDemolished: document.getElementById("avg-demolished"),
+        totMVP: document.getElementById("tot-mvp"),
+
+        liveTeams: document.getElementById("live-teams"),
       };
+
+      const USERNAME = "Spyx08";
+      const PLATFORM = "epic";
+
+      function togglePanel(type) {
+        const pSession = document.getElementById("panel-session");
+        const pLive = document.getElementById("panel-live");
+        const bSession = document.getElementById("btn-session");
+        const bLive = document.getElementById("btn-live");
+
+        if (type === "session") {
+          pSession.classList.toggle("hidden");
+          bSession.textContent = pSession.classList.contains("hidden")
+            ? "Stats Session ▼"
+            : "Stats Session ▲";
+        } else {
+          pLive.classList.toggle("hidden");
+          bLive.textContent = pLive.classList.contains("hidden")
+            ? "Game en cours ▼"
+            : "Game en cours ▲";
+        }
+      }
+
+      function triggerAnimation(text, typeClass) {
+        ui.announcer.textContent = text;
+        ui.announcer.className = "announcer";
+        void ui.announcer.offsetWidth;
+        ui.announcer.classList.add(typeClass);
+      }
 
       function updateUI() {
         ui.wins.textContent = state.wins;
@@ -128,98 +424,242 @@
           ui.delta.className =
             "val " + (diff > 0 ? "text-win" : diff < 0 ? "text-loss" : "");
         }
+
+        ui.totGoals.textContent = state.totalGoals;
+        ui.totAssists.textContent = state.totalAssists;
+        ui.totSaves.textContent = state.totalSaves;
+        ui.totDemolished.textContent = state.totalDemolished;
+        ui.totMVP.textContent = state.totalMVPs;
+
+        if (state.totalMatches > 0) {
+          ui.avgGoals.textContent = `${(state.totalGoals / state.totalMatches).toFixed(1)} / m`;
+          ui.avgAssists.textContent = `${(state.totalAssists / state.totalMatches).toFixed(1)} / m`;
+          ui.avgSaves.textContent = `${(state.totalSaves / state.totalMatches).toFixed(1)} / m`;
+          ui.avgDemolished.textContent = `${(state.totalDemolished / state.totalMatches).toFixed(1)} / m`;
+        }
       }
 
-      // --- 1. CONNEXION À L'API NATIVE DE ROCKET LEAGUE ---
-      function connectRLNative() {
-        // On se connecte à notre propre serveur Node, et plus au jeu directement !
-        const ws = new WebSocket("ws://localhost:3001");
+      function updateLivePanel(gameData) {
+        if (!gameData.Game || !gameData.Game.Teams || !gameData.Players) return;
+        const teams = gameData.Game.Teams;
+        const players = gameData.Players;
+        let newHTML = "";
 
+        teams
+          .sort((a, b) => a.TeamNum - b.TeamNum)
+          .forEach((team) => {
+            const teamColor = `#${team.ColorPrimary || "888888"}`;
+            const teamPlayers = players
+              .filter((p) => p.TeamNum === team.TeamNum)
+              .sort((a, b) => b.Score - a.Score);
+
+            newHTML += `<div class="team-col" style="border-top: 4px solid ${teamColor};">
+                        <div class="team-name" style="color: ${teamColor};">${team.Name || "ÉQUIPE"} - ${team.Score}</div>`;
+
+            teamPlayers.forEach((p) => {
+              const isMe =
+                p.Name === USERNAME ? "color: #fff; font-weight: 800;" : "";
+              newHTML += `<div class="player-row" style="${isMe}">
+                          <span class="p-name">${p.Name}</span>
+                          <span class="p-stats">${p.Score} | ${p.Goals}B ${p.Assists}P ${p.Saves}A</span>
+                        </div>`;
+            });
+            newHTML += `</div>`;
+          });
+
+        if (newHTML !== state.lastLiveHTML) {
+          ui.liveTeams.innerHTML = newHTML;
+          state.lastLiveHTML = newHTML;
+        }
+      }
+
+      function resetLivePanel() {
+        state.lastLiveHTML = "";
+        ui.liveTeams.innerHTML =
+          '<div style="grid-column: span 2; text-align: center; color: var(--text-muted); font-size: 0.85rem;">En attente de joueurs...</div>';
+      }
+
+      function connectRLNative() {
+        const ws = new WebSocket("ws://localhost:3001");
         ws.onopen = () =>
           console.log("✅ Connecté à l'API Native de Rocket League");
 
         ws.onmessage = (event) => {
-          const payload = JSON.parse(event.data);
-          const gameData = JSON.parse(payload.Data);
-          // Réinitialiser le verrou quand on rentre dans une nouvelle partie
-          if (
-            payload.Event === "MatchCreated" ||
-            payload.Event === "MatchDestroyed"
-          ) {
-            state.matchAlreadyCounted = false;
-          }
+          try {
+            const payload = JSON.parse(event.data);
+            let gameData = payload.Data;
+            if (typeof gameData === "string") gameData = JSON.parse(gameData);
 
-          if (payload.Event === "UpdateState" && typeof gameData === "object") {
-            const myName = "Spyx08";
+            if (
+              payload.Event === "MatchCreated" ||
+              payload.Event === "MatchDestroyed"
+            ) {
+              state.matchAlreadyCounted = false;
+              state.lastPlayersState = [];
+              resetLivePanel();
+            }
 
-            if (gameData.Players && Array.isArray(gameData.Players)) {
+            if (
+              payload.Event === "UpdateState" &&
+              typeof gameData === "object" &&
+              gameData.Players
+            ) {
               const myPlayerObj = gameData.Players.find(
-                (p) => p.Name === myName,
+                (p) => p.Name === USERNAME,
+              );
+              const previousMe = state.lastPlayersState.find(
+                (p) => p.Name === USERNAME,
               );
 
-              // Étape 1 : On mémorise l'équipe (0 ou 1) pendant que l'on joue
               if (myPlayerObj && myPlayerObj.TeamNum !== undefined) {
                 state.myCurrentTeamNum = myPlayerObj.TeamNum;
               }
+
+              // ==========================================
+              // NOUVEAU : MISE À JOUR LIVE DES STATS SESSION
+              // ==========================================
+              if (myPlayerObj && previousMe) {
+                let statsChanged = false;
+
+                // Ajout des deltas de score
+                const dGoals = myPlayerObj.Goals - previousMe.Goals;
+                if (dGoals > 0) {
+                  state.totalGoals += dGoals;
+                  statsChanged = true;
+                }
+
+                const dAssists = myPlayerObj.Assists - previousMe.Assists;
+                if (dAssists > 0) {
+                  state.totalAssists += dAssists;
+                  statsChanged = true;
+                }
+
+                const dSaves = myPlayerObj.Saves - previousMe.Saves;
+                if (dSaves > 0) {
+                  state.totalSaves += dSaves;
+                  statsChanged = true;
+                }
+
+                // Astuce pour détecter si on s'est fait démolir (perte de la voiture hors replay)
+                if (
+                  gameData.Game &&
+                  !gameData.Game.bReplay &&
+                  !gameData.Game.bHasWinner
+                ) {
+                  if (
+                    previousMe.bHasCar === true &&
+                    myPlayerObj.bHasCar === false
+                  ) {
+                    state.totalDemolished++;
+                    statsChanged = true;
+                  }
+                }
+
+                if (statsChanged) updateUI();
+              }
+
+              updateLivePanel(gameData);
+
+              gameData.Players.forEach((currentPlayer) => {
+                const previousPlayer = state.lastPlayersState.find(
+                  (p) => p.Name === currentPlayer.Name,
+                );
+                if (
+                  previousPlayer &&
+                  currentPlayer.Goals > previousPlayer.Goals
+                ) {
+                  triggerAnimation(
+                    `⚽ BUT : ${currentPlayer.Name.toUpperCase()} !`,
+                    "show-goal",
+                  );
+                }
+              });
+
+              state.lastPlayersState = gameData.Players;
             }
-          }
-          // L'événement dépend de la structure de l'API Native.
-          // Généralement, un "MatchEnded" ou "Goal" est émis.
-          if (payload.Event === "MatchEnded") {
-            // Logique simplifiée : vérifier si le joueur local a gagné
-            const isWinner = state.myCurrentTeamNum == gameData.WinnerTeamNum;
 
-            if (isWinner) state.wins++;
-            else state.losses++;
+            // FIN DE MATCH
+            if (payload.Event === "MatchEnded" && !state.matchAlreadyCounted) {
+              state.matchAlreadyCounted = true;
 
-            updateUI();
+              // CORRECTION : MatchEnded ne contient pas toujours les stats.
+              // On bascule sur la dernière sauvegarde connue (à la frame près).
+              const finalPlayers =
+                gameData.Players && gameData.Players.length > 0
+                  ? gameData.Players
+                  : state.lastPlayersState;
 
-            // On déclenche la récupération du MMR externe à la fin du match
-            fetchExternalMMR();
-          }
+              const myFinalObj = finalPlayers.find((p) => p.Name === USERNAME);
+
+              if (myFinalObj) {
+                state.totalMatches++;
+
+                const winnerTeamNum =
+                  gameData.WinnerTeamNum !== undefined
+                    ? gameData.WinnerTeamNum
+                    : gameData.Game
+                      ? gameData.Game.WinnerTeamNum
+                      : null;
+                const isWinner = state.myCurrentTeamNum === winnerTeamNum;
+
+                if (isWinner) {
+                  state.wins++;
+                  triggerAnimation("🏆 VICTOIRE !", "show-win");
+
+                  // --- LOGIQUE MVP CORRIGÉE ---
+                  const myTeamPlayers = finalPlayers.filter(
+                    (p) => p.TeamNum === state.myCurrentTeamNum,
+                  );
+
+                  if (myTeamPlayers.length > 0) {
+                    // On trouve le score le plus élevé de notre équipe
+                    const highestScore = Math.max(
+                      ...myTeamPlayers.map((p) => p.Score || 0),
+                    );
+
+                    // Si on a le meilleur score (et qu'on a au moins joué), on est MVP
+                    if (
+                      myFinalObj.Score >= highestScore &&
+                      myFinalObj.Score > 0
+                    ) {
+                      state.totalMVPs++;
+                    }
+                  }
+                } else {
+                  state.losses++;
+                }
+
+                updateUI();
+                fetchExternalMMR();
+              }
+            }
+          } catch (e) {}
         };
 
         ws.onclose = () => {
-          console.log("❌ Déconnecté. Reconnexion dans 5s...");
           setTimeout(connectRLNative, 5000);
         };
       }
-      // Configuration de ton profil
-      const PLATFORM = "epic"; // 'steam', 'epic', 'psn', 'xbl'
-      const USERNAME = "Spyx08"; // Remplace par ton pseudo exact
 
       async function fetchExternalMMR() {
         try {
-          // On interroge désormais ton propre serveur local
           const response = await fetch(
             `http://localhost:3000/api/mmr/${PLATFORM}/${USERNAME}`,
           );
-
-          if (!response.ok)
-            throw new Error("Erreur de récupération depuis le proxy Node");
-
+          if (!response.ok) throw new Error("Erreur proxy Node");
           const data = await response.json();
 
-          // Le proxy Node a déjà fait le tri, on reçoit juste "mmr" et "rank"
-          const newMMR = data.mmr;
-          const newRank = data.rank;
-
-          state.deltaMMR = newMMR - state.currentMMR;
-
-          // Mise à jour du state
-          if (state.startMMR === null) state.startMMR = newMMR;
-          state.currentMMR = newMMR;
-          state.rank = newRank;
+          state.deltaMMR = data.mmr - state.currentMMR;
+          if (state.startMMR === null) state.startMMR = data.mmr;
+          state.currentMMR = data.mmr;
+          state.rank = data.rank;
 
           updateUI();
-        } catch (error) {
-          console.error("Échec de la mise à jour du MMR :", error);
-        }
+        } catch (error) {}
       }
 
-      // Initialisation
       connectRLNative();
-      fetchExternalMMR(); // Premier appel pour initialiser l'overlay au lancement
+      fetchExternalMMR();
     </script>
   </body>
 </html>
