@@ -3,6 +3,8 @@ const cors = require("cors");
 const net = require("net");
 const WebSocket = require("ws");
 
+const { fetchProfile } = require("trn-rocket-league");
+
 const app = express();
 const PORT = 3000;
 const WS_PORT = 3001; // Port pour le WebSocket de l'overlay
@@ -36,41 +38,28 @@ app.get("/api/mmr/:platform/:username", async (req, res) => {
     )}`;
 
     // On simule un navigateur basique pour ne pas se faire rejeter d'office
-    const response = await fetch(trnUrl, {
+    /*const response = await fetch(trnUrl, {
       headers: {
         "TRN-Api-Key": TRN_API_KEY,
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         Accept: "application/json",
       },
-    });
+    });*/
+    const response = await fetchProfile(username, platform);
 
-    if (!response.ok) {
+    if (!response) {
       console.error(
-        `[ERREUR] TRN a répondu avec le statut : ${response.status}`,
+        `[ERREUR] Impossible de recup le profile pour ${username} sur TRN`,
       );
-      return res.status(response.status).json({
+      return res.status(500).json({
         error: "Erreur lors de la communication avec Tracker Network",
       });
     }
 
-    const json = await response.json();
-
-    // 3. Extraction de la donnée 2v2
-    const doublesStats = json.data.segments.find(
-      (s) => s.metadata.name === "Ranked Doubles 2v2",
-    );
-
-    if (!doublesStats) {
-      return res
-        .status(404)
-        .json({ error: "Statistiques 2v2 introuvables pour ce joueur" });
-    }
-
     // 4. Formatage du résultat final
     const result = {
-      mmr: doublesStats.stats.rating.value,
-      rank: `${doublesStats.stats.tier.metadata.name} - ${doublesStats.stats.division.metadata.name}`,
+      rankedStats: response.stats.ranked,
     };
 
     // Mise en cache des nouvelles données
