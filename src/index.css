@@ -67,16 +67,28 @@ body {
   height: 35px;
 }
 
-.header-rank-block { display: flex; flex-direction: column; gap: 2px; }
-.header-rank-name { font-size: 1rem; font-weight: 700; line-height: 1.2; }
-.header-player-name { font-size: 0.7rem; color: var(--text-muted); font-weight: 400; }
+.header-rank-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.header-rank-name {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.header-player-name {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
 
 .setup-hint {
   font-size: 0.78rem;
   color: var(--text-muted);
   text-align: center;
   padding: 4px 0 2px;
-  border-top: 1px solid rgba(255,255,255,0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .stats {
@@ -218,17 +230,26 @@ body {
   font-weight: 600;
   animation: pulseBorder 2s ease infinite;
 }
-.setup-banner-icon { font-size: 1rem; }
+.setup-banner-icon {
+  font-size: 1rem;
+}
 
 @keyframes pulseBorder {
-  0%, 100% { border-color: rgba(251,191,36,0.3); }
-  50%       { border-color: rgba(251,191,36,0.7); }
+  0%,
+  100% {
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 0.7);
+  }
 }
 
 /* Player card selectable state */
 .player-card--selectable {
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    transform 0.1s;
 }
 .player-card--selectable:hover {
   background: rgba(251, 191, 36, 0.12);
@@ -252,11 +273,16 @@ body {
   padding: 1px 4px;
   border-radius: 4px;
   opacity: 0.5;
-  transition: opacity 0.2s, color 0.2s;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
   font-family: var(--font);
   line-height: 1;
 }
-.reset-player-btn:hover { opacity: 1; color: var(--loss); }
+.reset-player-btn:hover {
+  opacity: 1;
+  color: var(--loss);
+}
 
 /* Score header */
 .score-header {
@@ -365,9 +391,6 @@ body {
 .player-card--me {
   background: rgba(255, 255, 255, 0.08);
   border-color: var(--glow-color, var(--accent));
-  box-shadow:
-    0 0 12px rgba(var(--glow-color, 59 130 246) / 0.3),
-    inset 0 0 20px rgba(var(--glow-color, 59 130 246) / 0.05);
 }
 
 .player-card-bar {
@@ -632,7 +655,6 @@ body {
 
 .anim-bar--gold {
   background: var(--gold);
-  box-shadow: 0 0 12px var(--gold);
 }
 
 @keyframes barSlide {
