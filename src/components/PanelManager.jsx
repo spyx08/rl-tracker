@@ -87,6 +87,10 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
           onPointerUp={onPointerUp}
           title="Déplacer"
         >⠿</span>
+        <span
+          className={`manager-server-dot ${wsConnected ? 'manager-server-dot--on' : 'manager-server-dot--off'}`}
+          title={wsConnected ? 'Serveur connecté' : 'Serveur déconnecté'}
+        />
         <button
           className={`manager-gear ${open ? 'manager-gear--open' : ''}`}
           onClick={() => setOpen(v => !v)}
@@ -100,16 +104,21 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
       {open && (
         <div className="manager-popup">
 
-          {/* ── Version ── */}
-          <div className="manager-version">v{version}</div>
-
-          <div className="manager-divider" />
-
-          {/* ── Statut serveur ── */}
-          <div className="manager-server-status">
-            <span className={`manager-server-dot ${wsConnected ? 'manager-server-dot--on' : 'manager-server-dot--off'}`} />
-            <span>{wsConnected ? 'Serveur connecté' : 'Serveur déconnecté'}</span>
+          {/* ── Version + statut update inline ── */}
+          <div className="manager-version">
+            v{version}
+            {updateInfo?.status === 'checking'    && <span className="upd-badge" title="Vérification…"> · 🔍</span>}
+            {updateInfo?.status === 'up-to-date'  && <span className="upd-badge upd-badge--ok"> · ✓ à jour</span>}
+            {updateInfo?.status === 'available'   && <span className="upd-badge upd-badge--new"> · ⬇ v{updateInfo.version}</span>}
+            {updateInfo?.status === 'downloading' && <span className="upd-badge upd-badge--new"> · ⬇ {updateInfo.percent}%</span>}
+            {updateInfo?.status === 'downloaded'  && <span className="upd-badge upd-badge--ready"> · ↻ v{updateInfo.version} prête</span>}
+            {updateInfo?.status === 'error'       && <span className="upd-badge upd-badge--error" title={updateInfo.message}> · ⚠</span>}
           </div>
+          {updateInfo?.status === 'downloaded' && (
+            <button className="manager-action-btn manager-action-btn--update" style={{ marginTop: 4 }} onClick={handleInstallUpdate}>
+              ↻ Installer v{updateInfo.version} et redémarrer
+            </button>
+          )}
 
           <div className="manager-divider" />
 
@@ -165,61 +174,6 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
             {quitting ? '⏳ Envoi stats…' : '✕ Quitter l\'application'}
           </button>
 
-          {/* ── Section mise à jour ── */}
-          {updateInfo?.status === 'checking' && (
-            <>
-              <div className="manager-divider" />
-              <div className="manager-update-info manager-update-info--muted">
-                🔍 Vérification des mises à jour…
-              </div>
-            </>
-          )}
-          {updateInfo?.status === 'up-to-date' && (
-            <>
-              <div className="manager-divider" />
-              <div className="manager-update-info manager-update-info--muted">
-                ✓ Application à jour
-              </div>
-            </>
-          )}
-          {updateInfo?.status === 'available' && (
-            <>
-              <div className="manager-divider" />
-              <div className="manager-update-info">
-                ⬇ Mise à jour v{updateInfo.version} disponible…
-              </div>
-            </>
-          )}
-          {updateInfo?.status === 'downloading' && (
-            <>
-              <div className="manager-divider" />
-              <div className="manager-update-info">
-                ⬇ Téléchargement… {updateInfo.percent}%
-                <div className="manager-update-bar">
-                  <div className="manager-update-bar-fill" style={{ width: `${updateInfo.percent}%` }} />
-                </div>
-              </div>
-            </>
-          )}
-          {updateInfo?.status === 'downloaded' && (
-            <>
-              <div className="manager-divider" />
-              <div className="manager-update-info">
-                ✓ Mise à jour v{updateInfo.version} prête
-              </div>
-              <button className="manager-action-btn manager-action-btn--update" onClick={handleInstallUpdate}>
-                ↻ Installer et redémarrer
-              </button>
-            </>
-          )}
-          {updateInfo?.status === 'error' && (
-            <>
-              <div className="manager-divider" />
-              <div className="manager-update-info manager-update-info--error" title={updateInfo.message}>
-                ⚠ Erreur de mise à jour
-              </div>
-            </>
-          )}
         </div>
       )}
     </div>

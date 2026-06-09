@@ -324,13 +324,18 @@ body {
   transition: width 0.3s ease;
 }
 
-/* Version */
+/* Version + badge update inline */
 .manager-version {
   font-size: 10px;
   color: var(--text-muted);
   text-align: center;
   letter-spacing: 0.05em;
 }
+.upd-badge         { font-size: 10px; }
+.upd-badge--ok     { color: var(--win); }
+.upd-badge--new    { color: #60a5fa; }
+.upd-badge--ready  { color: var(--win); font-weight: 600; }
+.upd-badge--error  { color: var(--loss); cursor: help; }
 
 /* Statut serveur */
 .manager-server-status {
