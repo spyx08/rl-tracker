@@ -317,6 +317,14 @@ body {
   transition: width 0.3s ease;
 }
 
+/* Version */
+.manager-version {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
 /* Statut serveur */
 .manager-server-status {
   display: flex;
