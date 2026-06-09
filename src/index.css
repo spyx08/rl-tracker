@@ -220,8 +220,49 @@ body {
   font-family: var(--font);
   transition: color 0.15s, border-color 0.15s;
 }
-.manager-action-btn:hover { color: var(--text-main); border-color: var(--border-hi); }
-.manager-action-btn--danger:hover { color: var(--loss); border-color: var(--loss); }
+.manager-action-btn:hover         { color: var(--text-main); border-color: var(--border-hi); }
+.manager-action-btn--danger:hover { color: var(--loss);      border-color: var(--loss); }
+.manager-action-btn--update       { color: var(--win);       border-color: var(--win); }
+.manager-action-btn--update:hover { color: #fff;             border-color: #fff; }
+
+/* Badge rouge sur le bouton engrenage quand une MAJ est dispo */
+.manager-gear { position: relative; }
+.manager-update-badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--loss);
+  box-shadow: 0 0 6px var(--loss);
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(0.75); }
+}
+
+/* Section mise à jour dans le popup */
+.manager-update-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.manager-update-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-inset);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.manager-update-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HUD PRINCIPAL

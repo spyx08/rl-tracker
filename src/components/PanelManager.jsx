@@ -14,7 +14,7 @@ function getSavedPosition() {
   return { x: window.innerWidth - 50, y: 20 };
 }
 
-export default function PanelManager({ panels, onToggle, editMode, onToggleEdit, onReset }) {
+export default function PanelManager({ panels, onToggle, editMode, onToggleEdit, onReset, updateInfo }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos]   = useState(getSavedPosition);
   const dragRef         = useRef(null);
@@ -45,8 +45,14 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
     localStorage.setItem('panel-pos-manager', JSON.stringify(newPos));
   };
 
-  const handleReset = () => { onReset(); setOpen(false); };
-  const handleQuit  = () => window.electronAPI?.quit();
+  const handleReset         = () => { onReset(); setOpen(false); };
+  const handleQuit          = () => window.electronAPI?.quit();
+  const handleInstallUpdate = () => window.electronAPI?.installUpdate();
+
+  // Afficher un badge si une mise à jour est disponible ou téléchargée
+  const hasUpdate = updateInfo?.status === 'available'
+                 || updateInfo?.status === 'downloading'
+                 || updateInfo?.status === 'downloaded';
 
   return (
     <div className="panel-manager" style={{ left: pos.x, top: pos.y }}>
@@ -62,7 +68,10 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
           className={`manager-gear ${open ? 'manager-gear--open' : ''}`}
           onClick={() => setOpen(v => !v)}
           title="Gérer les panneaux"
-        >⚙</button>
+        >
+          ⚙
+          {hasUpdate && <span className="manager-update-badge" />}
+        </button>
       </div>
 
       {open && (
@@ -97,6 +106,38 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
           <button className="manager-action-btn manager-action-btn--danger" onClick={handleQuit}>
             ✕ Quitter l'application
           </button>
+
+          {/* ── Section mise à jour ── */}
+          {updateInfo?.status === 'available' && (
+            <>
+              <div className="manager-divider" />
+              <div className="manager-update-info">
+                ⬇ Mise à jour v{updateInfo.version} en cours de téléchargement…
+              </div>
+            </>
+          )}
+          {updateInfo?.status === 'downloading' && (
+            <>
+              <div className="manager-divider" />
+              <div className="manager-update-info">
+                ⬇ Téléchargement… {updateInfo.percent}%
+                <div className="manager-update-bar">
+                  <div className="manager-update-bar-fill" style={{ width: `${updateInfo.percent}%` }} />
+                </div>
+              </div>
+            </>
+          )}
+          {updateInfo?.status === 'downloaded' && (
+            <>
+              <div className="manager-divider" />
+              <div className="manager-update-info">
+                ✓ Mise à jour v{updateInfo.version} prête
+              </div>
+              <button className="manager-action-btn manager-action-btn--update" onClick={handleInstallUpdate}>
+                ↻ Installer et redémarrer
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

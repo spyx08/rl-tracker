@@ -20,9 +20,16 @@ function loadPanelConfig() {
 }
 
 export default function App() {
-  const [panels, setPanels]       = useState(loadPanelConfig);
-  const [editMode, setEditMode]   = useState(false);
-  const [layoutKey, setLayoutKey] = useState(0);
+  const [panels, setPanels]         = useState(loadPanelConfig);
+  const [editMode, setEditMode]     = useState(false);
+  const [layoutKey, setLayoutKey]   = useState(0);
+  const [updateInfo, setUpdateInfo] = useState(null);
+
+  // ── Écouter les événements de mise à jour depuis le main process ──────────
+  useEffect(() => {
+    const cleanup = window.electronAPI?.onUpdateStatus((data) => setUpdateInfo(data));
+    return () => cleanup?.();
+  }, []);
 
   // ── Edit mode: tell the main process to fully disable click-through ──────
   // This ensures mousedown/mouseup reach the renderer during drag, with no
@@ -101,6 +108,7 @@ export default function App() {
         editMode={editMode}
         onToggleEdit={() => setEditMode(v => !v)}
         onReset={resetLayout}
+        updateInfo={updateInfo}
       />
     </GameProvider>
   );
