@@ -7,7 +7,7 @@ const {
   utilityProcess,
 } = require("electron");
 const path = require("path");
-const fs   = require("fs");
+const fs = require("fs");
 const { autoUpdater } = require("electron-updater");
 
 let mainWindow = null;
@@ -22,18 +22,24 @@ function startBackendServer() {
   const serverPath = path.join(serverDir, "server.js");
 
   // ── Log file (visible dans l'app packagée) ────────────────────────────────
-  const logDir  = app.getPath("logs");
+  const logDir = app.getPath("logs");
   const logPath = path.join(logDir, "server.log");
   // Rotation simple : on garde les 200 dernières Ko
   try {
     if (fs.existsSync(logPath) && fs.statSync(logPath).size > 200_000)
       fs.unlinkSync(logPath);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   const writeLog = (line) => {
     const entry = `[${new Date().toISOString()}] ${line}`;
     process.stdout.write(entry);
-    try { fs.appendFileSync(logPath, entry); } catch { /* ignore */ }
+    try {
+      fs.appendFileSync(logPath, entry);
+    } catch {
+      /* ignore */
+    }
   };
 
   writeLog(`Starting server from: ${serverPath}\n`);
@@ -102,11 +108,17 @@ function createWindow() {
 
   // Ré-assertion sur les événements système susceptibles de perturber le z-order
   mainWindow.on("blur", assertOnTop);
-  mainWindow.on("hide", () => { mainWindow?.showInactive(); assertOnTop(); });
-  mainWindow.on("minimize", () => { mainWindow?.restore(); assertOnTop(); });
+  mainWindow.on("hide", () => {
+    mainWindow?.showInactive();
+    assertOnTop();
+  });
+  mainWindow.on("minimize", () => {
+    mainWindow?.restore();
+    assertOnTop();
+  });
 
   screen.on("display-metrics-changed", () => setTimeout(assertOnTop, 200));
-  screen.on("display-added",           () => setTimeout(assertOnTop, 200));
+  screen.on("display-added", () => setTimeout(assertOnTop, 200));
 
   // Polling de sécurité toutes les 2 s (léger — couvre les cas résiduels
   // sans surcharger le processus principal pendant la partie)
@@ -125,19 +137,34 @@ function setupAutoUpdater() {
   // Only run in packaged app — dev builds skip update checks
   if (!app.isPackaged) return;
 
-  autoUpdater.autoDownload    = true;   // téléchargement automatique en fond
-  autoUpdater.autoInstallOnAppQuit = true; // installation automatique à la fermeture
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
 
-  const send = (data) => mainWindow?.webContents.send('update-status', data);
+  // Token lecture seule — nécessaire pour les releases d'un repo privé
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "spyx08",
+    repo: "rl-tracker",
+    token:
+      "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",
+  });
 
-  autoUpdater.on('checking-for-update',  ()     => send({ status: 'checking' }));
-  autoUpdater.on('update-not-available', ()     => send({ status: 'up-to-date' }));
-  autoUpdater.on('update-available',     (info) => send({ status: 'available',   version: info.version }));
-  autoUpdater.on('download-progress',    (p)    => send({ status: 'downloading', percent: Math.round(p.percent) }));
-  autoUpdater.on('update-downloaded',    (info) => send({ status: 'downloaded',  version: info.version }));
-  autoUpdater.on('error',                (err)  => {
-    console.error('[updater]', err.message);
-    send({ status: 'error', message: err.message });
+  const send = (data) => mainWindow?.webContents.send("update-status", data);
+
+  autoUpdater.on("checking-for-update", () => send({ status: "checking" }));
+  autoUpdater.on("update-not-available", () => send({ status: "up-to-date" }));
+  autoUpdater.on("update-available", (info) =>
+    send({ status: "available", version: info.version }),
+  );
+  autoUpdater.on("download-progress", (p) =>
+    send({ status: "downloading", percent: Math.round(p.percent) }),
+  );
+  autoUpdater.on("update-downloaded", (info) =>
+    send({ status: "downloaded", version: info.version }),
+  );
+  autoUpdater.on("error", (err) => {
+    console.error("[updater]", err.message);
+    send({ status: "error", message: err.message });
   });
 
   // Vérification au démarrage (après que la fenêtre soit prête)
