@@ -303,6 +303,13 @@ body {
   flex-direction: column;
   gap: 5px;
 }
+.manager-update-info--muted {
+  opacity: 0.6;
+}
+.manager-update-info--error {
+  color: var(--loss);
+  cursor: help;
+}
 .manager-update-bar {
   width: 100%;
   height: 4px;

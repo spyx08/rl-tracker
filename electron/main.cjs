@@ -135,7 +135,10 @@ function setupAutoUpdater() {
   autoUpdater.on('update-available',     (info) => send({ status: 'available',   version: info.version }));
   autoUpdater.on('download-progress',    (p)    => send({ status: 'downloading', percent: Math.round(p.percent) }));
   autoUpdater.on('update-downloaded',    (info) => send({ status: 'downloaded',  version: info.version }));
-  autoUpdater.on('error',                (err)  => console.error('[updater]', err.message));
+  autoUpdater.on('error',                (err)  => {
+    console.error('[updater]', err.message);
+    send({ status: 'error', message: err.message });
+  });
 
   // Vérification au démarrage (après que la fenêtre soit prête)
   autoUpdater.checkForUpdates();

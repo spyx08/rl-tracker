@@ -166,11 +166,27 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
           </button>
 
           {/* ── Section mise à jour ── */}
+          {updateInfo?.status === 'checking' && (
+            <>
+              <div className="manager-divider" />
+              <div className="manager-update-info manager-update-info--muted">
+                🔍 Vérification des mises à jour…
+              </div>
+            </>
+          )}
+          {updateInfo?.status === 'up-to-date' && (
+            <>
+              <div className="manager-divider" />
+              <div className="manager-update-info manager-update-info--muted">
+                ✓ Application à jour
+              </div>
+            </>
+          )}
           {updateInfo?.status === 'available' && (
             <>
               <div className="manager-divider" />
               <div className="manager-update-info">
-                ⬇ Mise à jour v{updateInfo.version} en cours de téléchargement…
+                ⬇ Mise à jour v{updateInfo.version} disponible…
               </div>
             </>
           )}
@@ -194,6 +210,14 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
               <button className="manager-action-btn manager-action-btn--update" onClick={handleInstallUpdate}>
                 ↻ Installer et redémarrer
               </button>
+            </>
+          )}
+          {updateInfo?.status === 'error' && (
+            <>
+              <div className="manager-divider" />
+              <div className="manager-update-info manager-update-info--error" title={updateInfo.message}>
+                ⚠ Erreur de mise à jour
+              </div>
             </>
           )}
         </div>
