@@ -258,8 +258,7 @@ body {
 .manager-action-btn--danger:hover {
   color: var(--loss);
   border-color: var(--loss);
-}
-.manager-action-btn--update {
+}.manager-action-btn--update {
   color: var(--win);
   border-color: var(--win);
 }
@@ -498,6 +497,14 @@ body {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   border-left: 4px solid var(--text-muted);
+}
+
+.mmr-chart-wrapper {
+  grid-column: span 4;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border);
 }
 
 .ext-box {

@@ -78,6 +78,7 @@ const initialState = {
   startMMR: null,
   currentMMR: 0,
   deltaMMR: 0,
+  mmrHistory: [],   // [mmr, mmr, …] une entrée par update post-match
   rank: savedUsername ? "Chargement..." : "Non configuré",
   rankImg: "",
   matchAlreadyCounted: false,
@@ -118,6 +119,7 @@ function gameReducer(state, action) {
         startMMR: null,
         currentMMR: 0,
         deltaMMR: 0,
+        mmrHistory: [],
         totalMatches: 0,
         totalGoals: 0,
         totalAssists: 0,
@@ -222,6 +224,11 @@ function gameReducer(state, action) {
     case "MMR_UPDATED": {
       const { mmr, rank, rankImg } = action.payload;
       const deltaMMR = state.currentMMR > 0 ? mmr - state.currentMMR : 0;
+      // N'ajoute à l'historique que si la valeur est différente de la dernière
+      const lastMmr  = state.mmrHistory[state.mmrHistory.length - 1];
+      const mmrHistory = lastMmr !== mmr
+        ? [...state.mmrHistory, mmr]
+        : state.mmrHistory;
       return {
         ...state,
         currentMMR: mmr,
@@ -229,6 +236,7 @@ function gameReducer(state, action) {
         rank,
         rankImg,
         startMMR: state.startMMR === null ? mmr : state.startMMR,
+        mmrHistory,
       };
     }
 
