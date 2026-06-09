@@ -1,17 +1,17 @@
 :root {
-  --bg:         rgba(15, 23, 42, 0.82);
-  --bg-panel:   rgba(30, 41, 59, 0.78);
-  --bg-card:    rgba(36, 48, 68, 0.75);
-  --bg-inset:   rgba(20, 29, 43, 0.85);
-  --border:     rgba(45, 63, 84, 0.90);
-  --border-hi:  rgba(61, 84, 112, 0.90);
-  --text-main:  #f8fafc;
+  --bg: rgba(15, 23, 42, 0.82);
+  --bg-panel: rgba(30, 41, 59, 0.78);
+  --bg-card: rgba(36, 48, 68, 0.75);
+  --bg-inset: rgba(20, 29, 43, 0.85);
+  --border: rgba(45, 63, 84, 0.9);
+  --border-hi: rgba(61, 84, 112, 0.9);
+  --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --accent:     #3b82f6;
-  --win:        #10b981;
-  --loss:       #ef4444;
-  --gold:       #fbbf24;
-  --font:       "Segoe UI", Roboto, sans-serif;
+  --accent: #3b82f6;
+  --win: #10b981;
+  --loss: #ef4444;
+  --gold: #fbbf24;
+  --font: "Segoe UI", Roboto, sans-serif;
 }
 
 * {
@@ -38,7 +38,7 @@ body {
 /* ─── Draggable panels ───────────────────────────────────────────────────── */
 
 .draggable-panel {
-  position: fixed;   /* viewport-relative, no containing-block surprises */
+  position: fixed; /* viewport-relative, no containing-block surprises */
   display: inline-flex;
   flex-direction: column;
   min-width: 480px;
@@ -47,8 +47,12 @@ body {
 }
 
 @keyframes panelEnter {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .draggable-panel--edit {
@@ -67,11 +71,13 @@ body {
   border-bottom: none;
   border-radius: 10px 10px 0 0;
   user-select: none;
-  touch-action: none;  /* required for pointer capture */
+  touch-action: none; /* required for pointer capture */
   cursor: grab;
 }
 
-.drag-handle:active  { cursor: grabbing; }
+.drag-handle:active {
+  cursor: grabbing;
+}
 
 .drag-grip {
   font-size: 1rem;
@@ -104,20 +110,29 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  opacity: 0.1;
+}
+
+.manager-header:hover {
+  opacity: 1;
 }
 
 .manager-grip {
   font-size: 0.85rem;
   color: var(--text-muted);
-  opacity: 0.4;
+  opacity: 0.1;
   cursor: grab;
   padding: 4px;
   transition: opacity 0.15s;
   user-select: none;
-  touch-action: none;  /* required for pointer capture */
+  touch-action: none; /* required for pointer capture */
 }
-.manager-grip:hover  { opacity: 1; }
-.manager-grip:active { cursor: grabbing; }
+.manager-grip:hover {
+  opacity: 1;
+}
+.manager-grip:active {
+  cursor: grabbing;
+}
 
 .manager-gear {
   width: 34px;
@@ -131,11 +146,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
   font-family: var(--font);
 }
-.manager-gear:hover   { color: var(--text-main); border-color: var(--border-hi); }
-.manager-gear--open   { color: var(--accent); border-color: var(--accent); background: var(--bg-inset); }
+.manager-gear:hover {
+  color: var(--text-main);
+  border-color: var(--border-hi);
+}
+.manager-gear--open {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-inset);
+}
 
 .manager-popup {
   position: absolute;
@@ -183,11 +208,13 @@ body {
   border-radius: 9px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
   font-family: var(--font);
 }
 .manager-switch::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 2px;
   top: 50%;
@@ -196,7 +223,9 @@ body {
   height: 12px;
   border-radius: 50%;
   background: var(--text-muted);
-  transition: left 0.2s, background 0.2s;
+  transition:
+    left 0.2s,
+    background 0.2s;
 }
 .manager-switch--on {
   background: var(--accent);
@@ -218,27 +247,52 @@ body {
   width: 100%;
   text-align: center;
   font-family: var(--font);
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
-.manager-action-btn:hover         { color: var(--text-main); border-color: var(--border-hi); }
-.manager-action-btn--danger:hover { color: var(--loss);      border-color: var(--loss); }
-.manager-action-btn--update       { color: var(--win);       border-color: var(--win); }
-.manager-action-btn--update:hover { color: #fff;             border-color: #fff; }
+.manager-action-btn:hover {
+  color: var(--text-main);
+  border-color: var(--border-hi);
+}
+.manager-action-btn--danger:hover {
+  color: var(--loss);
+  border-color: var(--loss);
+}
+.manager-action-btn--update {
+  color: var(--win);
+  border-color: var(--win);
+}
+.manager-action-btn--update:hover {
+  color: #fff;
+  border-color: #fff;
+}
 
 /* Badge rouge sur le bouton engrenage quand une MAJ est dispo */
-.manager-gear { position: relative; }
+.manager-gear {
+  position: relative;
+}
 .manager-update-badge {
   position: absolute;
-  top: 4px; right: 4px;
-  width: 8px; height: 8px;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--loss);
   box-shadow: 0 0 6px var(--loss);
   animation: pulse-badge 1.5s ease-in-out infinite;
 }
 @keyframes pulse-badge {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.6; transform: scale(0.75); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.75);
+  }
 }
 
 /* Section mise à jour dans le popup */
@@ -274,12 +328,20 @@ body {
   padding: 2px 0;
 }
 .manager-server-dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.manager-server-dot--on  { background: var(--win);  box-shadow: 0 0 5px var(--win); }
-.manager-server-dot--off { background: var(--loss); box-shadow: 0 0 5px var(--loss); animation: pulse-badge 1.5s ease-in-out infinite; }
+.manager-server-dot--on {
+  background: var(--win);
+  box-shadow: 0 0 5px var(--win);
+}
+.manager-server-dot--off {
+  background: var(--loss);
+  box-shadow: 0 0 5px var(--loss);
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    HUD PRINCIPAL

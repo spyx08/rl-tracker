@@ -89,17 +89,27 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   // ── Maintenir l'overlay au premier plan ──────────────────────────────────
-  // Windows peut abaisser le Z-order ou cacher la fenêtre quand une app
-  // fullscreen prend le focus. On ré-asserte et on force le réaffichage.
+  // En mode "fenêtre sans bordure" dans RL, DWM reste actif et notre fenêtre
+  // TOPMOST s'affiche naturellement au-dessus. L'appel natif koffi est plus
+  // fiable que l'API Electron seule, surtout après un changement de bureau/écran.
+  // On ne touche QUE notre propre fenêtre — aucune interférence avec RL.
   const assertOnTop = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+
     mainWindow.setAlwaysOnTop(true, "screen-saver");
     if (!mainWindow.isVisible()) mainWindow.showInactive();
   };
 
+  // Ré-assertion sur les événements système susceptibles de perturber le z-order
   mainWindow.on("blur", assertOnTop);
-  mainWindow.on("hide", () => mainWindow?.showInactive());
+  mainWindow.on("hide", () => { mainWindow?.showInactive(); assertOnTop(); });
+  mainWindow.on("minimize", () => { mainWindow?.restore(); assertOnTop(); });
 
+  screen.on("display-metrics-changed", () => setTimeout(assertOnTop, 200));
+  screen.on("display-added",           () => setTimeout(assertOnTop, 200));
+
+  // Polling de sécurité toutes les 2 s (léger — couvre les cas résiduels
+  // sans surcharger le processus principal pendant la partie)
   const topInterval = setInterval(assertOnTop, 2000);
   mainWindow.on("closed", () => clearInterval(topInterval));
 
