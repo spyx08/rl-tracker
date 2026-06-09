@@ -8,7 +8,7 @@ function makeConfetti(count = 80) {
     id: i,
     left: Math.random() * 100,
     delay: Math.random() * 1.8,
-    duration: 2.2 + Math.random() * 2,
+    duration: 2.5 + Math.random() * 2,
     width: 7 + Math.random() * 9,
     height: 4 + Math.random() * 10,
     color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
@@ -28,10 +28,7 @@ export default function AnimationOverlay() {
     clearTimeout(timerRef.current);
 
     const isWin = announcement.type === 'win';
-    setAnim({
-      ...announcement,
-      confetti: isWin ? makeConfetti() : null,
-    });
+    setAnim({ ...announcement, confetti: isWin ? makeConfetti() : null });
 
     timerRef.current = setTimeout(() => setAnim(null), isWin ? 6500 : 4000);
     return () => clearTimeout(timerRef.current);
@@ -39,18 +36,18 @@ export default function AnimationOverlay() {
 
   if (!anim) return null;
 
-  const isWin = anim.type === 'win';
-  const isMyTeamGoal = anim.type === 'goal' && anim.meta?.isMyTeam;
+  const isWin       = anim.type === 'win';
+  const isMyGoal    = anim.type === 'goal' && anim.meta?.isMyTeam;
 
   return (
     <div
       key={anim.key}
-      className={`anim-overlay ${isWin ? 'anim-win' : isMyTeamGoal ? 'anim-my-goal' : 'anim-goal'}`}
+      className={`anim-overlay ${isWin ? 'anim-win' : isMyGoal ? 'anim-my-goal' : 'anim-goal'}`}
     >
-      {/* Flash backdrop */}
-      <div className="anim-flash" />
+      {/* Backdrop solide — reveal via clip-path, zéro opacité */}
+      <div className="anim-backdrop" />
 
-      {/* Confetti (victoire uniquement) */}
+      {/* Confetti — couleurs solides, pas de fondu */}
       {isWin && anim.confetti.map((c) => (
         <div
           key={c.id}
@@ -69,19 +66,22 @@ export default function AnimationOverlay() {
         />
       ))}
 
-      {/* Contenu central */}
+      {/* Contenu */}
       <div className="anim-content">
-        {isWin ? <WinContent /> : <GoalContent meta={anim.meta} isMyTeam={isMyTeamGoal} />}
+        {isWin
+          ? <WinContent />
+          : <GoalContent meta={anim.meta} isMyGoal={isMyGoal} />
+        }
       </div>
     </div>
   );
 }
 
-function GoalContent({ meta, isMyTeam }) {
+function GoalContent({ meta, isMyGoal }) {
   return (
     <>
-      {isMyTeam && <div className="anim-sparks" aria-hidden="true" />}
-      <div className={`anim-label ${isMyTeam ? 'anim-label--mine' : 'anim-label--neutral'}`}>
+      {isMyGoal && <div className="anim-sparks" aria-hidden="true" />}
+      <div className={`anim-label ${isMyGoal ? 'anim-label--mine' : 'anim-label--neutral'}`}>
         BUT
       </div>
       <div className="anim-bar" />
@@ -93,7 +93,7 @@ function GoalContent({ meta, isMyTeam }) {
 function WinContent() {
   return (
     <>
-      <div className="anim-trophy" aria-hidden="true">🏆</div>
+      <div className="anim-trophy">🏆</div>
       <div className="anim-label anim-label--win">VICTOIRE</div>
       <div className="anim-bar anim-bar--gold" />
       <div className="anim-scorer anim-scorer--win">GG WP</div>

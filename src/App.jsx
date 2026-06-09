@@ -7,25 +7,20 @@ import LivePanel from './components/LivePanel.jsx';
 
 export default function App() {
   const [sessionVisible, setSessionVisible] = useState(false);
-  const [liveVisible, setLiveVisible] = useState(false);
+  const [liveVisible, setLiveVisible]       = useState(false);
 
   return (
     <GameProvider>
       <AnimationOverlay />
       <div className="overlay-wrapper">
-        <Header />
-
-        <div className="controls">
-          <button className="toggle-btn" onClick={() => setSessionVisible((v) => !v)}>
-            Stats Session {sessionVisible ? '▲' : '▼'}
-          </button>
-          <button className="toggle-btn" onClick={() => setLiveVisible((v) => !v)}>
-            Game en cours {liveVisible ? '▲' : '▼'}
-          </button>
-        </div>
-
+        <Header
+          sessionVisible={sessionVisible}
+          liveVisible={liveVisible}
+          onToggleSession={() => setSessionVisible((v) => !v)}
+          onToggleLive={()    => setLiveVisible((v) => !v)}
+        />
         <SessionPanel visible={sessionVisible} />
-        <LivePanel visible={liveVisible} />
+        <LivePanel    visible={liveVisible} />
       </div>
     </GameProvider>
   );

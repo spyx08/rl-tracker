@@ -70,9 +70,11 @@ const initialState = {
   // Joueur détecté (null = pas encore identifié)
   username: savedUsername,
   platform: savedPlatform,
+  usernameNotInGame: false, // true si le username stocké n'est pas trouvé dans la partie en cours
 
   wins: 0,
   losses: 0,
+  streak: 0,        // >0 = win streak, <0 = loss streak
   startMMR: null,
   currentMMR: 0,
   deltaMMR: 0,
@@ -97,15 +99,22 @@ const initialState = {
 
 function gameReducer(state, action) {
   switch (action.type) {
+    case "CHECK_PLAYER": {
+      // Le jeu n'expose pas bLocalPlayer : on vérifie au moins que le username stocké est dans la partie
+      const found = action.payload.players.some((p) => p.Name === state.username);
+      return { ...state, usernameNotInGame: !found };
+    }
+
     case "SET_PLAYER":
       return {
         ...state,
         username: action.payload.username,
         platform: action.payload.platform,
+        usernameNotInGame: false,
         rank: "Chargement...",
-        // Réinitialise les stats de session quand on change de joueur
         wins: 0,
         losses: 0,
+        streak: 0,
         startMMR: null,
         currentMMR: 0,
         deltaMMR: 0,
@@ -123,8 +132,10 @@ function gameReducer(state, action) {
         matchAlreadyCounted: false,
         lastPlayers: [],
         matchMaxPlayers: 0,
+        gameMode: null,   // reset pour que la détection du prochain mode triggere bien l'effet MMR
         livePlayers: [],
         liveTeams: [],
+        usernameNotInGame: false,
       };
 
     case "UPDATE_STATE": {
@@ -193,6 +204,7 @@ function gameReducer(state, action) {
 
       if (state.myCurrentTeamNum === winnerTeamNum) {
         next.wins = state.wins + 1;
+        next.streak = state.streak > 0 ? state.streak + 1 : 1;
         const myTeam = finalPlayers.filter(
           (p) => p.TeamNum === state.myCurrentTeamNum,
         );
@@ -201,6 +213,7 @@ function gameReducer(state, action) {
           next.totalMVPs = state.totalMVPs + 1;
       } else {
         next.losses = state.losses + 1;
+        next.streak = state.streak < 0 ? state.streak - 1 : -1;
       }
 
       return next;
@@ -270,7 +283,7 @@ export function GameProvider({ children }) {
     myTeamRef,
     setPlayer,
   );
-  useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches);
+  useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username);
 
   return (
     <GameContext.Provider value={{ state, announcement, setPlayer }}>
@@ -297,6 +310,9 @@ function useRLWebSocket(
   useEffect(() => {
     lastPlayersRef.current = lastPlayers;
   }, [lastPlayers]);
+
+  // Armé à true à chaque nouveau match pour relancer la détection même si un username est déjà stocké
+  const needsRedetectionRef = useRef(true);
 
   // setPlayer est stable (useCallback) — pas besoin de ref
   useEffect(() => {
@@ -326,6 +342,8 @@ function useRLWebSocket(
             case "MatchCreated":
             case "MatchDestroyed":
               dispatch({ type: "MATCH_RESET" });
+              // Réarme la détection : le compte connecté a peut-être changé depuis la dernière partie
+              needsRedetectionRef.current = true;
               break;
 
             case "UpdateState": {
@@ -335,14 +353,32 @@ function useRLWebSocket(
               const teams = gameData.Game?.Teams ?? null;
               const game = gameData.Game ?? {};
 
-              // Auto-détection du joueur local si pas encore connu
-              if (!usernameRef.current) {
+              // Relance la détection au début de chaque nouveau match (pas seulement si username est vide)
+              if (needsRedetectionRef.current) {
+                needsRedetectionRef.current = false; // ne tenter qu'une fois par match
                 const detected = detectLocalPlayer(gameData);
+
                 if (detected) {
-                  console.log(
-                    `🎮 Joueur local détecté automatiquement : ${detected.name} (${detected.platform})`,
-                  );
+                  // Champ explicite trouvé dans l'event — source fiable
+                  if (detected.name !== usernameRef.current) {
+                    console.log(
+                      `🔄 Changement de compte détecté : ${usernameRef.current} → ${detected.name} (${detected.platform})`,
+                    );
+                  } else {
+                    console.log(
+                      `🎮 Joueur local confirmé : ${detected.name} (${detected.platform})`,
+                    );
+                  }
                   setPlayer(detected.name, detected.platform);
+                } else if (!usernameRef.current) {
+                  // Aucun champ auto-détectable et pas d'username stocké → UI de sélection
+                  console.log("⚠️ Impossible de détecter le joueur local automatiquement");
+                }
+                // Si detected === null mais usernameRef.current existe :
+                // le jeu n'expose pas bLocalPlayer → on garde l'username stocké
+                // mais on dispatche CHECK_PLAYER pour vérifier qu'il est bien dans la partie
+                if (!detected && usernameRef.current) {
+                  dispatch({ type: "CHECK_PLAYER", payload: { players } });
                 }
               }
 
@@ -406,7 +442,7 @@ function useRLWebSocket(
 
 // ─── Hook: External MMR ───────────────────────────────────────────────────────
 
-function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches) {
+function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, username) {
   // Ref sur le gameMode pour toujours lire la valeur courante dans le callback async
   const gameModeRef = useRef(gameMode);
   useEffect(() => { gameModeRef.current = gameMode; }, [gameMode]);
@@ -414,7 +450,7 @@ function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches) {
   const fetchMMR = useCallback(async () => {
     const username = usernameRef.current;
     const platform = platformRef.current;
-    if (!username) return;
+    if (!username || !gameModeRef.current) return;
     try {
       const res = await fetch(`http://localhost:3000/api/mmr/${platform}/${username}`);
       if (!res.ok) throw new Error("Erreur proxy Node");
@@ -437,7 +473,9 @@ function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches) {
     }
   }, [dispatch, platformRef, usernameRef]);
 
+  // Se déclenche au montage, après chaque match, si username change,
+  // ET dès que le mode de jeu est détecté (début de partie)
   useEffect(() => {
     fetchMMR();
-  }, [fetchMMR, totalMatches]);
+  }, [fetchMMR, totalMatches, username, gameMode]);
 }

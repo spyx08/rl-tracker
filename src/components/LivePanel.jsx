@@ -4,9 +4,10 @@ export default function LivePanel({ visible }) {
   const { state } = useGame();
   const { livePlayers, liveTeams, myCurrentTeamNum, username } = state;
 
+  const { usernameNotInGame } = state;
   const hasData = livePlayers.length > 0 && liveTeams.length > 0;
   const sortedTeams = [...liveTeams].sort((a, b) => a.TeamNum - b.TeamNum);
-  const needsSetup = !username && hasData;
+  const needsSetup = (!username || usernameNotInGame) && hasData;
 
   return (
     <div className={`panel live-game-panel ${visible ? '' : 'hidden'}`}>
@@ -42,10 +43,18 @@ export default function LivePanel({ visible }) {
 }
 
 function SetupBanner() {
+  const { state } = useGame();
+  const isSwitch = state.usernameNotInGame && state.username;
+
   return (
     <div className="setup-banner">
-      <span className="setup-banner-icon">👤</span>
-      <span>Cliquez sur votre nom dans le scoreboard</span>
+      <span className="setup-banner-icon">{isSwitch ? '🔄' : '👤'}</span>
+      <span>
+        {isSwitch
+          ? <>Compte <strong>{state.username}</strong> introuvable — cliquez sur votre nom</>
+          : <>Cliquez sur votre nom dans le scoreboard</>
+        }
+      </span>
     </div>
   );
 }
