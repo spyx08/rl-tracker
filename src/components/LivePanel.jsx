@@ -1,6 +1,6 @@
 import { useGame } from '../context/GameContext.jsx';
 
-export default function LivePanel({ visible }) {
+export default function LivePanel() {
   const { state } = useGame();
   const { livePlayers, liveTeams, myCurrentTeamNum, username } = state;
 
@@ -10,7 +10,7 @@ export default function LivePanel({ visible }) {
   const needsSetup = (!username || usernameNotInGame) && hasData;
 
   return (
-    <div className={`panel live-game-panel ${visible ? '' : 'hidden'}`}>
+    <div className="panel live-game-panel">
       {!hasData ? (
         <div className="live-waiting">En attente de joueurs...</div>
       ) : (

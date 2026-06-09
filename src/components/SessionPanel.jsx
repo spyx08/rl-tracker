@@ -10,17 +10,17 @@ function StatBox({ label, value, avg, valueClass = '' }) {
   );
 }
 
-export default function SessionPanel({ visible }) {
+export default function SessionPanel() {
   const { state } = useGame();
   const { totalMatches, totalGoals, totalAssists, totalSaves, totalDemolished, totalMVPs } = state;
 
   const avg = (n) => totalMatches > 0 ? (n / totalMatches).toFixed(1) : '0.0';
 
   return (
-    <div className={`panel extended-dashboard ${visible ? '' : 'hidden'}`}>
-      <StatBox label="Buts"         value={totalGoals}     avg={avg(totalGoals)} />
-      <StatBox label="Passes"       value={totalAssists}   avg={avg(totalAssists)} />
-      <StatBox label="Arrêts"       value={totalSaves}     avg={avg(totalSaves)} />
+    <div className="panel extended-dashboard">
+      <StatBox label="Buts"         value={totalGoals}      avg={avg(totalGoals)} />
+      <StatBox label="Passes"       value={totalAssists}    avg={avg(totalAssists)} />
+      <StatBox label="Arrêts"       value={totalSaves}      avg={avg(totalSaves)} />
       <StatBox label="Démos Subies" value={totalDemolished} avg={avg(totalDemolished)} valueClass="text-loss" />
       <div className="ext-box" style={{ gridColumn: 'span 4' }}>
         <span className="label">Titres de MVP</span>

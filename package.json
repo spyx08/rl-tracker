@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "start:server": "node ./server/server.js",
     "start": "vite --port 3005",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k -n \"VITE,ELECTRON\" -c \"cyan,yellow\" \"vite --port 3005\" \"wait-on http://localhost:3005 && cross-env NODE_ENV=development electron .\"",
+    "package": "npm --prefix ./server install --omit=dev && npm run build && electron-builder --win --config"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -15,6 +18,50 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.19"
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2",
+    "vite": "^5.4.19",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.rl-overlay",
+    "productName": "RL Overlay",
+    "copyright": "Copyright © 2025",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!.gitignore",
+          "!*.md"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
   }
 }
