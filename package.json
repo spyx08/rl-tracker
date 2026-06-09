@@ -11,8 +11,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently -k -n \"VITE,ELECTRON\" -c \"cyan,yellow\" \"vite --port 3005\" \"wait-on http://localhost:3005 && cross-env NODE_ENV=development electron .\"",
-    "package": "npm --prefix ./server install --omit=dev && npm run build && electron-builder --win --config",
-    "release": "npm --prefix ./server install --omit=dev && npm run build && electron-builder --win --publish always"
+    "clean": "node -e \"const fs=require('fs');try{fs.rmSync('release',{recursive:true,force:true})}catch(e){}\"",
+    "package": "npm run clean && npm --prefix ./server install --omit=dev && npm run build && electron-builder --win --config",
+    "release": "npm run clean && npm --prefix ./server install --omit=dev && npm run build && electron-builder --win --publish always"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
