@@ -57,7 +57,7 @@ Dans le jeu : **Paramètres → Vidéo → Mode d'affichage → Fenêtre sans bo
 
 ## Utilisation
 
-- L'overlay se lance automatiquement au démarrage du PC (après installation).
+- Lance l'application via le raccourci créé à l'installation.
 - Un **bouton ⚙** en haut à droite permet d'ouvrir le panneau de configuration.
 - En **mode édition**, tu peux déplacer chaque panneau librement à l'écran.
 - Hors mode édition, la fenêtre est entièrement **transparente aux clics** — tu joues normalement.
