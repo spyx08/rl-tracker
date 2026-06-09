@@ -1,4 +1,4 @@
-import { RANK_BANDS, TIER_FILLS } from '../utils/rankBands.js';
+import { RANK_BANDS, TIER_FILLS, TIER_LABEL_COLORS } from '../utils/rankBands.js';
 
 const VW  = 320;          // viewBox width (unités SVG)
 const PAD = { t: 8, r: 10, b: 18, l: 36 };
@@ -65,20 +65,27 @@ export default function MmrChart({ mmrHistory, height = 88 }) {
 
       {/* Bandes de rang */}
       {bands.map(b => {
-        const fill = TIER_FILLS[b.tier][b.tierIdx % 2];
-        const y1   = Math.max(yOf(b.max), PAD.t);
-        const y2   = Math.min(yOf(b.min), PAD.t + cH);
-        const bH   = y2 - y1;
+        const fill      = TIER_FILLS[b.tier][b.tierIdx % 2];
+        const labelColor = TIER_LABEL_COLORS[b.tier];
+        const y1 = Math.max(yOf(b.max), PAD.t);
+        const y2 = Math.min(yOf(b.min), PAD.t + cH);
+        const bH = y2 - y1;
         if (bH <= 0) return null;
+        const labelY = y1 + bH / 2;
         return (
           <g key={b.name}>
             <rect x={PAD.l} y={y1} width={cW} height={bH} fill={fill} clipPath="url(#mc-clip)" />
-            {bH > 9 && (
+            {/* Séparateur de rang */}
+            <line x1={PAD.l} y1={y1} x2={PAD.l + cW} y2={y1}
+              stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" clipPath="url(#mc-clip)" />
+            {/* Label nom du rang */}
+            {bH > 10 && (
               <text
-                x={PAD.l + 3}
-                y={y1 + Math.min(bH, 13) / 2 + 3.5}
-                fontSize="6.5"
-                fill="rgba(255,255,255,0.38)"
+                x={PAD.l + 5}
+                y={labelY + 3.5}
+                fontSize="8"
+                fontWeight="600"
+                fill={labelColor}
                 fontFamily="sans-serif"
               >
                 {b.short}

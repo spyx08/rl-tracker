@@ -1,4 +1,4 @@
-import { RANK_BANDS, TIER_FILLS } from './rankBands.js';
+import { RANK_BANDS, TIER_FILLS, TIER_LABEL_COLORS } from './rankBands.js';
 
 const DEFAULT_WEBHOOK =
   'https://discord.com/api/webhooks/1513983362463698984/l6Uew877nLgZ_xy9rftE1Aj9mHB1ZZB4aeLMttgLfGTcpELT06IWW6bZryR6e--I8ihN';
@@ -50,11 +50,19 @@ function buildChartBlob(mmrHistory) {
     if (bH <= 0) continue;
     ctx.fillStyle = TIER_FILLS[b.tier][b.tierIdx % 2];
     ctx.fillRect(PAD.l, y1, cW, bH);
+    // Séparateur de rang
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth   = 0.5;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(PAD.l, y1);
+    ctx.lineTo(PAD.l + cW, y1);
+    ctx.stroke();
     if (bH > 13) {
-      ctx.fillStyle = 'rgba(255,255,255,0.38)';
-      ctx.font = '11px sans-serif';
+      ctx.fillStyle = TIER_LABEL_COLORS[b.tier];
+      ctx.font      = 'bold 12px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(b.short, PAD.l + 6, y1 + bH / 2 + 4);
+      ctx.fillText(b.short, PAD.l + 8, y1 + bH / 2 + 4);
     }
   }
 

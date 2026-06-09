@@ -501,10 +501,10 @@ body {
 
 .mmr-chart-wrapper {
   grid-column: span 4;
-  border-radius: 6px;
+  /* Contre-balance le padding du .panel (16px 24px) pour coller aux bords */
+  margin: -16px -24px 4px -24px;
+  border-radius: 10px 10px 0 0;
   overflow: hidden;
-  background: rgba(0,0,0,0.18);
-  border: 1px solid var(--border);
 }
 
 .ext-box {

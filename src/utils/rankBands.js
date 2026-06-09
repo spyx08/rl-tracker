@@ -1,13 +1,25 @@
 // Couleurs de fond par tier : [variante paire, variante impaire]
 export const TIER_FILLS = {
-  bronze:   ['rgba(180,110, 50,0.22)', 'rgba(180,110, 50,0.13)'],
-  silver:   ['rgba(160,165,175,0.18)', 'rgba(160,165,175,0.10)'],
-  gold:     ['rgba(200,165, 30,0.22)', 'rgba(200,165, 30,0.13)'],
-  platinum: ['rgba( 20,180,210,0.18)', 'rgba( 20,180,210,0.10)'],
-  diamond:  ['rgba( 40,130,230,0.22)', 'rgba( 40,130,230,0.13)'],
-  champion: ['rgba(140, 50,220,0.18)', 'rgba(140, 50,220,0.10)'],
-  gc:       ['rgba(210, 40, 70,0.22)', 'rgba(210, 40, 70,0.13)'],
-  ssl:      ['rgba(255,150, 20,0.28)', 'rgba(255,150, 20,0.18)'],
+  bronze:   ['rgba(185,105, 35,0.48)', 'rgba(160, 85, 20,0.36)'],
+  silver:   ['rgba(175,180,192,0.40)', 'rgba(150,155,168,0.30)'],
+  gold:     ['rgba(215,170, 20,0.48)', 'rgba(190,145,  8,0.36)'],
+  platinum: ['rgba(  8,178,212,0.42)', 'rgba(  4,152,188,0.32)'],
+  diamond:  ['rgba( 38,122,242,0.46)', 'rgba( 18, 96,218,0.34)'],
+  champion: ['rgba(145, 42,228,0.42)', 'rgba(118, 20,202,0.32)'],
+  gc:       ['rgba(225, 32, 62,0.46)', 'rgba(198, 12, 42,0.34)'],
+  ssl:      ['rgba(235,242,255,0.38)', 'rgba(210,220,245,0.28)'],
+};
+
+// Couleur du texte des labels par tier (lisible sur le fond coloré)
+export const TIER_LABEL_COLORS = {
+  bronze:   'rgba(240,165, 90,0.90)',
+  silver:   'rgba(215,220,232,0.88)',
+  gold:     'rgba(255,210, 55,0.92)',
+  platinum: 'rgba( 50,215,245,0.88)',
+  diamond:  'rgba( 90,170,255,0.90)',
+  champion: 'rgba(195,105,255,0.88)',
+  gc:       'rgba(255, 85,115,0.90)',
+  ssl:      'rgba(255,255,255,0.95)',
 };
 
 // min/max = bornes MMR du rang complet (toutes divisions confondues)
