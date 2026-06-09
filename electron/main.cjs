@@ -3,9 +3,11 @@ const {
   BrowserWindow,
   ipcMain,
   screen,
+  shell,
   utilityProcess,
 } = require("electron");
 const path = require("path");
+const fs   = require("fs");
 const { autoUpdater } = require("electron-updater");
 
 let mainWindow = null;
@@ -19,6 +21,25 @@ function startBackendServer() {
     : path.join(__dirname, "../server");
   const serverPath = path.join(serverDir, "server.js");
 
+  // ── Log file (visible dans l'app packagée) ────────────────────────────────
+  const logDir  = app.getPath("logs");
+  const logPath = path.join(logDir, "server.log");
+  // Rotation simple : on garde les 200 dernières Ko
+  try {
+    if (fs.existsSync(logPath) && fs.statSync(logPath).size > 200_000)
+      fs.unlinkSync(logPath);
+  } catch { /* ignore */ }
+
+  const writeLog = (line) => {
+    const entry = `[${new Date().toISOString()}] ${line}`;
+    process.stdout.write(entry);
+    try { fs.appendFileSync(logPath, entry); } catch { /* ignore */ }
+  };
+
+  writeLog(`Starting server from: ${serverPath}\n`);
+  writeLog(`Server dir exists: ${fs.existsSync(serverDir)}\n`);
+  writeLog(`server.js exists:  ${fs.existsSync(serverPath)}\n`);
+
   // utilityProcess.fork() uses Electron's bundled Node.js — no system Node needed
   serverProcess = utilityProcess.fork(serverPath, [], {
     stdio: "pipe",
@@ -27,10 +48,15 @@ function startBackendServer() {
     env: { ...process.env },
   });
 
-  serverProcess.stdout?.on("data", (d) => process.stdout.write(d));
-  serverProcess.stderr?.on("data", (d) => process.stderr.write(d));
+  serverProcess.stdout?.on("data", (d) => writeLog(d.toString()));
+  serverProcess.stderr?.on("data", (d) => writeLog(`[ERR] ${d.toString()}`));
   serverProcess.on("exit", (code) => {
-    if (code !== 0) console.warn(`[server] exited with code ${code}`);
+    writeLog(`[EXIT] server exited with code ${code}\n`);
+    // Relance automatique si crash (hors fermeture volontaire)
+    if (code !== 0 && serverProcess !== null) {
+      writeLog("[RESTART] Restarting server in 3s...\n");
+      setTimeout(startBackendServer, 3000);
+    }
   });
 }
 
@@ -58,6 +84,24 @@ function createWindow() {
 
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  // Permet d'apparaître par-dessus les apps fullscreen via DWM/FSO
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  // ── Maintenir l'overlay au premier plan ──────────────────────────────────
+  // Windows peut abaisser le Z-order ou cacher la fenêtre quand une app
+  // fullscreen prend le focus. On ré-asserte et on force le réaffichage.
+  const assertOnTop = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.setAlwaysOnTop(true, "screen-saver");
+    if (!mainWindow.isVisible()) mainWindow.showInactive();
+  };
+
+  mainWindow.on("blur", assertOnTop);
+  mainWindow.on("hide", () => mainWindow?.showInactive());
+
+  const topInterval = setInterval(assertOnTop, 2000);
+  mainWindow.on("closed", () => clearInterval(topInterval));
 
   if (!app.isPackaged) {
     mainWindow.loadURL("http://localhost:3005");
@@ -126,5 +170,8 @@ ipcMain.on("quit", () => app.quit());
 
 // Installer la mise à jour téléchargée et redémarrer
 ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
+
+// Ouvrir le dossier des logs dans l'explorateur Windows
+ipcMain.on("open-logs", () => shell.openPath(app.getPath("logs")));
 
 if (!app.requestSingleInstanceLock()) app.quit();

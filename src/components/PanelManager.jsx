@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useGame } from '../context/GameContext.jsx';
 
 const PANEL_LABELS = {
   hud:     { icon: '📊', label: 'HUD' },
@@ -15,6 +16,7 @@ function getSavedPosition() {
 }
 
 export default function PanelManager({ panels, onToggle, editMode, onToggleEdit, onReset, updateInfo }) {
+  const { wsConnected } = useGame();
   const [open, setOpen] = useState(false);
   const [pos, setPos]   = useState(getSavedPosition);
   const dragRef         = useRef(null);
@@ -48,6 +50,7 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
   const handleReset         = () => { onReset(); setOpen(false); };
   const handleQuit          = () => window.electronAPI?.quit();
   const handleInstallUpdate = () => window.electronAPI?.installUpdate();
+  const handleOpenLogs      = () => window.electronAPI?.openLogs();
 
   // Afficher un badge si une mise à jour est disponible ou téléchargée
   const hasUpdate = updateInfo?.status === 'available'
@@ -100,8 +103,19 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
 
           <div className="manager-divider" />
 
+          {/* ── Statut serveur ── */}
+          <div className="manager-server-status">
+            <span className={`manager-server-dot ${wsConnected ? 'manager-server-dot--on' : 'manager-server-dot--off'}`} />
+            <span>{wsConnected ? 'Serveur connecté' : 'Serveur déconnecté'}</span>
+          </div>
+
+          <div className="manager-divider" />
+
           <button className="manager-action-btn" onClick={handleReset}>
             ↺ Réinitialiser la mise en page
+          </button>
+          <button className="manager-action-btn" onClick={handleOpenLogs}>
+            📋 Ouvrir les logs
           </button>
           <button className="manager-action-btn manager-action-btn--danger" onClick={handleQuit}>
             ✕ Quitter l'application

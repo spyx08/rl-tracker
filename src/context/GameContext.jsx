@@ -242,8 +242,9 @@ function gameReducer(state, action) {
 const GameContext = createContext(null);
 
 export function GameProvider({ children }) {
-  const [state, dispatch] = useReducer(gameReducer, initialState);
+  const [state, dispatch]       = useReducer(gameReducer, initialState);
   const [announcement, setAnnouncement] = useState(null);
+  const [wsConnected, setWsConnected]   = useState(false);
 
   const announce = useCallback((type, meta = {}) => {
     setAnnouncement({ type, meta, key: Date.now() });
@@ -282,11 +283,12 @@ export function GameProvider({ children }) {
     usernameRef,
     myTeamRef,
     setPlayer,
+    setWsConnected,
   );
   useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username);
 
   return (
-    <GameContext.Provider value={{ state, announcement, setPlayer }}>
+    <GameContext.Provider value={{ state, announcement, setPlayer, wsConnected }}>
       {children}
     </GameContext.Provider>
   );
@@ -305,6 +307,7 @@ function useRLWebSocket(
   usernameRef,
   myTeamRef,
   setPlayer,
+  setWsConnected,
 ) {
   const lastPlayersRef = useRef(lastPlayers);
   useEffect(() => {
@@ -323,8 +326,10 @@ function useRLWebSocket(
       if (dead) return;
       ws = new WebSocket("ws://localhost:3001");
 
-      ws.onopen = () =>
+      ws.onopen = () => {
         console.log("✅ Connecté à l'API Native de Rocket League");
+        setWsConnected(true);
+      };
 
       ws.onmessage = (event) => {
         try {
@@ -428,6 +433,7 @@ function useRLWebSocket(
       };
 
       ws.onclose = () => {
+        setWsConnected(false);
         if (!dead) setTimeout(connect, 5000);
       };
     }

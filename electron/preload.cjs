@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Retourne une fonction de nettoyage pour le useEffect React
     return () => ipcRenderer.removeListener('update-status', handler);
   },
+  openLogs: () => ipcRenderer.send('open-logs'),
 });

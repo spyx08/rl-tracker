@@ -264,6 +264,23 @@ body {
   transition: width 0.3s ease;
 }
 
+/* Statut serveur */
+.manager-server-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+.manager-server-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.manager-server-dot--on  { background: var(--win);  box-shadow: 0 0 5px var(--win); }
+.manager-server-dot--off { background: var(--loss); box-shadow: 0 0 5px var(--loss); animation: pulse-badge 1.5s ease-in-out infinite; }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    HUD PRINCIPAL
    ═══════════════════════════════════════════════════════════════════════════ */
