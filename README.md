@@ -51,11 +51,28 @@ Lance le fichier `.exe` téléchargé. L'installation est automatique (one-click
 
 ### 3. Configurer Rocket League
 
+#### Mode d'affichage
+
 Pour que l'overlay s'affiche par-dessus le jeu, Rocket League doit être en **mode fenêtre sans bordure** :
 
 Dans le jeu : **Paramètres → Vidéo → Mode d'affichage → Fenêtre sans bordure**
 
 *(Display Mode → Windowed Fullscreen en anglais)*
+
+#### Activer les statistiques en temps réel
+
+L'overlay a besoin des données de stats envoyées par le jeu. Tu dois modifier un fichier de configuration Rocket League :
+
+1. Ouvre l'explorateur de fichiers et navigue vers le dossier d'installation de Rocket League.
+   - **Localisation typique** : `C:\Program Files (x86)\Steam\steamapps\common\rocketleague`
+
+2. Ouvre le fichier : **`TAGame\Config\DefaultStatsAPI.ini`**
+
+3. Cherche la ligne `PacketSendRate=0` et change-la en `PacketSendRate=2`
+
+4. **Sauvegarde le fichier** et redémarre le jeu.
+
+> ℹ️ Si tu ne fais pas cette modification, l'overlay s'affichera mais ne recevra pas les événements du jeu (buts, stats, MMR).
 
 ---
 
