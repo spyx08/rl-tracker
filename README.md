@@ -6,7 +6,7 @@
 RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistiques en temps réel directement par-dessus le jeu, sans jamais interrompre ta partie.
 
 <div align="center">
-  <img src="screenshots/ingame_all_panels.png" alt="Aperçu général — tous les panneaux en jeu" width="720" />
+  <img src="screenshots/tracker_demo.gif" alt="Démo — RL Tracker en action" width="720" />
 </div>
 
 ### Ce que ça fait
@@ -43,7 +43,7 @@ Rends-toi sur la page des [**Releases**](https://github.com/spyx08/rl-tracker/re
 
 Clique sur la dernière version (en haut de la liste), puis télécharge le fichier **`RL-Overlay-Setup-x.x.x.exe`** dans la section **Assets**.
 
-> Si tu vois un avertissement Windows du type *"Windows a protégé votre PC"*, clique sur **Informations complémentaires** puis **Exécuter quand même**. C'est normal pour une application non signée.
+> Si tu vois un avertissement Windows du type _"Windows a protégé votre PC"_, clique sur **Informations complémentaires** puis **Exécuter quand même**. C'est normal pour une application non signée.
 
 ### 2. Installer
 
@@ -57,7 +57,7 @@ Pour que l'overlay s'affiche par-dessus le jeu, Rocket League doit être en **mo
 
 Dans le jeu : **Paramètres → Vidéo → Mode d'affichage → Fenêtre sans bordure**
 
-*(Display Mode → Windowed Fullscreen en anglais)*
+_(Display Mode → Windowed Fullscreen en anglais)_
 
 #### Activer les statistiques en temps réel
 
@@ -80,6 +80,9 @@ L'overlay a besoin des données de stats envoyées par le jeu. Tu dois modifier 
 
 - Lance l'application via le raccourci créé à l'installation.
 - Un **bouton ⚙** en haut à droite permet d'ouvrir le panneau de configuration.
+
+  <img src="screenshots/menu.png" alt="Menu de configuration" width="360" />
+
 - En **mode édition**, tu peux déplacer chaque panneau librement à l'écran.
 - Hors mode édition, la fenêtre est entièrement **transparente aux clics** — tu joues normalement.
 
