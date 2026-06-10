@@ -1,0 +1,80 @@
+{
+  "name": "rl-overlay",
+  "version": "1.1.7",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "author": "Alexis Nivelle",
+  "scripts": {
+    "start:server": "node ./server/server.js",
+    "start": "vite --port 3005",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently -k -n \"VITE,ELECTRON\" -c \"cyan,yellow\" \"vite --port 3005\" \"wait-on http://localhost:3005 && cross-env NODE_ENV=development electron .\"",
+    "clean": "node -e \"['release','server/node_modules','server/package-lock.json'].forEach(d=>{try{require('fs').rmSync(d,{recursive:true,force:true})}catch(e){}})\"",
+    "package": "npm run clean && npm run build && electron-builder --win --config",
+    "release": "npm run clean && npm run build && electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2",
+    "vite": "^5.4.19",
+    "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.rl-overlay",
+    "productName": "RL Overlay",
+    "copyright": "Copyright © 2025",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "afterPack": "./scripts/afterPack.cjs",
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "server.js",
+          "package.json",
+          ".env"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "electron/assets/icon.png",
+      "artifactName": "RL-Overlay-Setup-${version}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "spyx08",
+      "repo": "rl-tracker",
+      "releaseType": "draft"
+    }
+  }
+}
