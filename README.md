@@ -11,7 +11,7 @@ RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistique
 
 ### Ce que ça fait
 
-- 📊 **HUD** — visualise ton MMR, tes wins/losses et ta streak en un coup d'œil
+- 📊 **HUD** — visualise ton MMR, tes wins/losses et ta streak en un coup d'œil, avec une barre de progression dans ta division actuelle (points restants jusqu'à la division suivante et repère de ton MMR de début de session)
 
   <img src="screenshots/header_panel.png" alt="HUD panel" width="480" />
 
@@ -19,9 +19,13 @@ RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistique
 
   <img src="screenshots/ingame_session_panel.png" alt="Session Stats panel" width="480" />
 
-- 🎮 **Live Game** — informations en direct sur la partie en cours, avec animations sur les événements clés (buts, etc.)
+- 🎮 **Live Game** — informations en direct sur la partie en cours, avec animations sur les événements clés (buts, victoires). Trois thèmes d'animations au choix — **Néon**, **Rétro** (arcade CRT) et **Minimal** — sélectionnables depuis le menu ⚙, ou désactivables complètement.
 
   <img src="screenshots/ingame_goal_animation.png" alt="Live Game — animation but" width="480" />
+
+- 📅 **Dashboard** — toutes tes sessions sont enregistrées en local. Une fenêtre dédiée (accessible depuis le menu ⚙) affiche tes stats globales par mode de jeu (1v1 / 2v2 / 3v3), une analyse de tes données (meilleure tranche horaire, jour le plus rentable, séries record, détecteur de tilt…) et l'historique complet de tes sessions sous forme de timeline, navigable mois par mois avec recherche.
+
+  <img src="screenshots/dashboard.png" alt="Dashboard — stats globales, analyse et historique des sessions" width="720" />
 
 - 📣 **Résumé Discord** — à la fin de chaque session, un récapitulatif complet (MMR, résultats, stats, graphique de progression) est automatiquement posté sur le webhook Discord de ton choix.
 
@@ -61,7 +65,14 @@ _(Display Mode → Windowed Fullscreen en anglais)_
 
 #### Activer les statistiques en temps réel
 
-L'overlay a besoin des données de stats envoyées par le jeu. Tu dois modifier un fichier de configuration Rocket League :
+L'overlay a besoin des données de stats envoyées par le jeu (`PacketSendRate=2` dans `TAGame\Config\DefaultStatsAPI.ini`).
+
+**C'est automatique** : à chaque lancement, l'app détecte tes installations de Rocket League (Steam **et** Epic Games, y compris les bibliothèques Steam secondaires) et corrige le fichier si nécessaire. Si le fichier est protégé par Windows, une invite UAC te demandera de valider la correction. Le statut de la configuration est visible dans le menu ⚙.
+
+> ℹ️ Si le jeu était lancé pendant la correction, redémarre-le pour qu'elle soit prise en compte.
+
+<details>
+<summary>Faire la modification manuellement (si besoin)</summary>
 
 1. Ouvre l'explorateur de fichiers et navigue vers le dossier d'installation de Rocket League.
    - **Localisation typique** : `C:\Program Files (x86)\Steam\steamapps\common\rocketleague`
@@ -72,7 +83,7 @@ L'overlay a besoin des données de stats envoyées par le jeu. Tu dois modifier 
 
 4. **Sauvegarde le fichier** et redémarre le jeu.
 
-> ℹ️ Si tu ne fais pas cette modification, l'overlay s'affichera mais ne recevra pas les événements du jeu (buts, stats, MMR).
+</details>
 
 ---
 
