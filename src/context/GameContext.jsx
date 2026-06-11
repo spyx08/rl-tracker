@@ -137,6 +137,9 @@ const initialState = {
   sessionStartedAt: null,
   // Journal des matchs de la session : { ts, mode, result: 'win'|'loss'|null }
   matchLog: [],
+  // Timestamp du dernier match comptabilisé (MatchEnded ou forfait) —
+  // sert d'anti double-comptage, jamais persisté
+  lastCountedAt: 0,
 
   // Joueur détecté (null = pas encore identifié)
   username: savedUsername,
@@ -227,11 +230,20 @@ function gameReducer(state, action) {
       // Le score courant tranche si possible ; sinon un abandon = défaite
       // (c'est la règle du jeu pour un forfait/quit en ranked).
       let counted = {};
+      const now = Date.now();
       const wasInGame =
         !state.matchAlreadyCounted &&
         state.username &&
         state.myCurrentTeamNum != null &&
-        state.lastPlayers.some((p) => p.Name === state.username);
+        state.lastPlayers.some((p) => p.Name === state.username) &&
+        // Vrai match uniquement : les DEUX équipes ont des joueurs.
+        // Exclut freeplay/entraînement (un seul joueur, pas d'adversaire)
+        state.lastPlayers.some((p) => p.TeamNum === 0) &&
+        state.lastPlayers.some((p) => p.TeamNum === 1) &&
+        // Anti double-comptage : un UpdateState retardataire du match terminé
+        // (podium/replay) peut repeupler lastPlayers après le reset — si un
+        // match vient d'être compté, ce MatchDestroyed concerne le même match
+        now - state.lastCountedAt > 30_000;
 
       if (wasInGame) {
         const myTeam = state.liveTeams.find((t) => t.TeamNum === state.myCurrentTeamNum);
@@ -239,9 +251,10 @@ function gameReducer(state, action) {
         const won = !!(myTeam && oppTeam && myTeam.Score > oppTeam.Score);
         counted = {
           totalMatches: state.totalMatches + 1,
+          lastCountedAt: now,
           matchLog: [
             ...state.matchLog,
-            { ts: Date.now(), mode: state.gameMode, result: won ? "win" : "loss" },
+            { ts: now, mode: state.gameMode, result: won ? "win" : "loss" },
           ],
           ...(won
             ? { wins: state.wins + 1, streak: state.streak > 0 ? state.streak + 1 : 1 }
@@ -329,6 +342,7 @@ function gameReducer(state, action) {
         ...state,
         matchAlreadyCounted: true,
         totalMatches: state.totalMatches + 1,
+        lastCountedAt: Date.now(),
         matchLog: logMatch(null),
       };
 
