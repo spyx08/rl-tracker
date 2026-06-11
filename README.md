@@ -3,7 +3,7 @@
   <h1>RL Tracker — Overlay Rocket League</h1>
 </div>
 
-RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistiques en temps réel directement par-dessus le jeu, sans jamais interrompre ta partie.
+RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistiques en temps réel directement par-dessus le jeu, sans jamais interrompre ta partie — et qui garde l'historique de toutes tes sessions pour analyser ta progression.
 
 <div align="center">
   <img src="screenshots/tracker_demo.gif" alt="Démo — RL Tracker en action" width="720" />
@@ -97,6 +97,13 @@ L'overlay a besoin des données de stats envoyées par le jeu (`PacketSendRate=2
 - En **mode édition**, tu peux déplacer chaque panneau librement à l'écran.
 - Hors mode édition, la fenêtre est entièrement **transparente aux clics** — tu joues normalement.
 
+Depuis le menu ⚙ tu peux aussi :
+
+- **Ouvrir le Dashboard** — la fenêtre d'historique et d'analyse de tes sessions.
+- **Changer le thème des animations** (Néon / Rétro / Minimal) ou les désactiver (Off).
+- Vérifier le **statut de la config Rocket League** (StatsAPI) et du serveur interne.
+- Activer/désactiver la **publication du résumé de session sur Discord**.
+
 ### Mises à jour
 
 L'application vérifie les mises à jour automatiquement au démarrage. Quand une mise à jour est disponible, une notification apparaît dans le menu ⚙. Il suffit de cliquer sur **"Installer et redémarrer"**.
@@ -113,6 +120,9 @@ L'application vérifie les mises à jour automatiquement au démarrage. Quand un
 
 **L'overlay ne s'affiche pas par-dessus le jeu**
 → Vérifie que Rocket League est bien en mode **Fenêtre sans bordure** (pas Plein écran).
+
+**L'overlay s'affiche mais ne reçoit aucune stat (buts, MMR…)**
+→ Ouvre le menu ⚙ et vérifie la ligne de statut **Config RL StatsAPI**. Si elle indique une erreur, relance l'app (et valide l'invite UAC si elle apparaît), ou fais la modification manuellement (voir [Configurer Rocket League](#activer-les-statistiques-en-temps-réel)).
 
 **Le serveur apparaît comme déconnecté (point rouge dans le menu ⚙)**
 → Attends quelques secondes au démarrage, le serveur interne met 1 à 2 secondes à démarrer.
