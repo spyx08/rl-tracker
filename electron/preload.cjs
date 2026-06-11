@@ -12,4 +12,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-status', handler);
   },
   openLogs: () => ipcRenderer.send('open-logs'),
+
+  // ── Config StatsAPI Rocket League ──
+  getStatsApiStatus: () => ipcRenderer.invoke('statsapi-status-get'),
+  onStatsApiStatus:  (callback) => {
+    const handler = (_, data) => callback(data);
+    ipcRenderer.on('statsapi-status', handler);
+    return () => ipcRenderer.removeListener('statsapi-status', handler);
+  },
+
+  // ── Sessions / Dashboard ──
+  saveSession:   (record) => ipcRenderer.send('session-save', record),
+  getSessions:   ()       => ipcRenderer.invoke('sessions-get'),
+  openDashboard: ()       => ipcRenderer.send('open-dashboard'),
+  onSessionsUpdated: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('sessions-updated', handler);
+    return () => ipcRenderer.removeListener('sessions-updated', handler);
+  },
 });

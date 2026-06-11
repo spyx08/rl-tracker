@@ -71,6 +71,9 @@ const SNAPSHOT_MAX_AGE_MS = 2 * 60 * 60 * 1000; // au-delà : nouvelle session
 // Uniquement les stats de session — jamais les états transitoires
 // (livePlayers, liveTeams, lastPlayers, matchAlreadyCounted, myCurrentTeamNum)
 const PERSISTED_KEYS = [
+  "sessionId",
+  "sessionStartedAt",
+  "matchLog",
   "wins",
   "losses",
   "streak",
@@ -123,7 +126,18 @@ function loadSessionSnapshot(username) {
 const savedUsername = localStorage.getItem("rl_username") ?? null;
 const savedPlatform = localStorage.getItem("rl_platform") ?? "epic";
 
+function newSessionId() {
+  return `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
 const initialState = {
+  // Identité de la session courante (persiste dans le snapshot, donc survit
+  // aux crashs : la même session continue d'être upsertée dans le stockage)
+  sessionId: null,
+  sessionStartedAt: null,
+  // Journal des matchs de la session : { ts, mode, result: 'win'|'loss'|null }
+  matchLog: [],
+
   // Joueur détecté (null = pas encore identifié)
   username: savedUsername,
   platform: savedPlatform,
@@ -158,6 +172,12 @@ const initialState = {
 // et aux redémarrages d'electron-updater
 Object.assign(initialState, loadSessionSnapshot(savedUsername));
 
+// Pas de session restaurée : on en démarre une nouvelle
+if (!initialState.sessionId) {
+  initialState.sessionId = newSessionId();
+  initialState.sessionStartedAt = Date.now();
+}
+
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 
 function gameReducer(state, action) {
@@ -171,6 +191,10 @@ function gameReducer(state, action) {
     case "SET_PLAYER":
       return {
         ...state,
+        // Changement de compte = nouvelle session dans l'historique
+        sessionId: newSessionId(),
+        sessionStartedAt: Date.now(),
+        matchLog: [],
         username: action.payload.username,
         platform: action.payload.platform,
         usernameNotInGame: false,
@@ -197,9 +221,37 @@ function gameReducer(state, action) {
     case "SET_PLATFORM":
       return { ...state, platform: action.payload };
 
-    case "MATCH_RESET":
+    case "MATCH_RESET": {
+      // Partie quittée avant l'event MatchEnded (ex: forfait puis quit immédiat) :
+      // on comptabilise le match en cours avant de tout réinitialiser.
+      // Le score courant tranche si possible ; sinon un abandon = défaite
+      // (c'est la règle du jeu pour un forfait/quit en ranked).
+      let counted = {};
+      const wasInGame =
+        !state.matchAlreadyCounted &&
+        state.username &&
+        state.myCurrentTeamNum != null &&
+        state.lastPlayers.some((p) => p.Name === state.username);
+
+      if (wasInGame) {
+        const myTeam = state.liveTeams.find((t) => t.TeamNum === state.myCurrentTeamNum);
+        const oppTeam = state.liveTeams.find((t) => t.TeamNum !== state.myCurrentTeamNum);
+        const won = !!(myTeam && oppTeam && myTeam.Score > oppTeam.Score);
+        counted = {
+          totalMatches: state.totalMatches + 1,
+          matchLog: [
+            ...state.matchLog,
+            { ts: Date.now(), mode: state.gameMode, result: won ? "win" : "loss" },
+          ],
+          ...(won
+            ? { wins: state.wins + 1, streak: state.streak > 0 ? state.streak + 1 : 1 }
+            : { losses: state.losses + 1, streak: state.streak < 0 ? state.streak - 1 : -1 }),
+        };
+      }
+
       return {
         ...state,
+        ...counted,
         matchAlreadyCounted: false,
         lastPlayers: [],
         matchMaxPlayers: 0,
@@ -208,6 +260,7 @@ function gameReducer(state, action) {
         liveTeams: [],
         usernameNotInGame: false,
       };
+    }
 
     case "UPDATE_STATE": {
       const { players, teams, game } = action.payload;
@@ -267,10 +320,16 @@ function gameReducer(state, action) {
       const me = finalPlayers.find((p) => p.Name === state.username);
       if (!me) return state;
 
+      const logMatch = (result) => [
+        ...state.matchLog,
+        { ts: Date.now(), mode: state.gameMode, result },
+      ];
+
       let next = {
         ...state,
         matchAlreadyCounted: true,
         totalMatches: state.totalMatches + 1,
+        matchLog: logMatch(null),
       };
 
       // Vainqueur ou équipe inconnus : on compte le match (les stats individuelles
@@ -278,6 +337,7 @@ function gameReducer(state, action) {
       if (winnerTeamNum == null || state.myCurrentTeamNum == null) return next;
 
       if (state.myCurrentTeamNum === winnerTeamNum) {
+        next.matchLog = logMatch("win");
         next.wins = state.wins + 1;
         next.streak = state.streak > 0 ? state.streak + 1 : 1;
         const myTeam = finalPlayers.filter(
@@ -287,6 +347,7 @@ function gameReducer(state, action) {
         if (me.Score >= topScore && me.Score > 0)
           next.totalMVPs = state.totalMVPs + 1;
       } else {
+        next.matchLog = logMatch("loss");
         next.losses = state.losses + 1;
         next.streak = state.streak < 0 ? state.streak - 1 : -1;
       }
@@ -359,6 +420,28 @@ export function GameProvider({ children }) {
       localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
     } catch {
       /* quota plein ou storage indisponible : tant pis pour ce snapshot */
+    }
+
+    // Historique persistant (fichier via Electron) : on n'enregistre que les
+    // sessions avec au moins un match joué. Upsert par sessionId — le même
+    // enregistrement est mis à jour après chaque match.
+    if (state.totalMatches > 0 && state.sessionId) {
+      window.electronAPI?.saveSession({
+        id: state.sessionId,
+        username: state.username,
+        startedAt: state.sessionStartedAt,
+        endedAt: Date.now(),
+        wins: state.wins,
+        losses: state.losses,
+        totalMatches: state.totalMatches,
+        totalGoals: state.totalGoals,
+        totalAssists: state.totalAssists,
+        totalSaves: state.totalSaves,
+        totalMVPs: state.totalMVPs,
+        totalDemolished: state.totalDemolished,
+        mmrByMode: state.mmrByMode,
+        matchLog: state.matchLog,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

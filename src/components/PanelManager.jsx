@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame, clearSessionSnapshot } from '../context/GameContext.jsx';
 import { sendSessionSummary } from '../utils/discord.js';
 import { version } from '../../package.json';
@@ -9,6 +9,13 @@ const PANEL_LABELS = {
   live:    { icon: '🎮', label: 'Live Game' },
 };
 
+const ANIM_THEMES = [
+  { id: 'neon',    label: 'Néon' },
+  { id: 'retro',   label: 'Rétro' },
+  { id: 'minimal', label: 'Minimal' },
+  { id: 'off',     label: 'Off' },
+];
+
 function getSavedPosition() {
   try {
     const stored = localStorage.getItem('panel-pos-manager');
@@ -17,7 +24,7 @@ function getSavedPosition() {
   return { x: window.innerWidth - 50, y: 20 };
 }
 
-export default function PanelManager({ panels, onToggle, editMode, onToggleEdit, onReset, updateInfo }) {
+export default function PanelManager({ panels, onToggle, editMode, onToggleEdit, onReset, updateInfo, animTheme, onChangeAnimTheme }) {
   const { wsConnected, state } = useGame();
   const [open, setOpen] = useState(false);
   const [pos, setPos]   = useState(getSavedPosition);
@@ -27,6 +34,13 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
     () => localStorage.getItem('rl_discord_enabled') !== 'false'
   );
   const [quitting, setQuitting] = useState(false);
+  const [statsApi, setStatsApi] = useState(null);
+
+  useEffect(() => {
+    window.electronAPI?.getStatsApiStatus?.().then(setStatsApi);
+    const cleanup = window.electronAPI?.onStatsApiStatus?.(setStatsApi);
+    return () => cleanup?.();
+  }, []);
 
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
@@ -123,6 +137,21 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
             </button>
           )}
 
+          {/* ── Config StatsAPI Rocket League ── */}
+          {statsApi && (
+            <div
+              className={`manager-statsapi manager-statsapi--${statsApi.status}`}
+              title="TAGame\Config\DefaultStatsAPI.ini — PacketSendRate doit valoir 2"
+            >
+              {statsApi.status === 'ok'        && `✓ Config RL StatsAPI à jour (${statsApi.count} fichier${statsApi.count > 1 ? 's' : ''})`}
+              {statsApi.status === 'fixed'     && `✓ Config RL StatsAPI corrigée (PacketSendRate=2)`}
+              {statsApi.status === 'checking'  && '🔍 Vérification config RL StatsAPI…'}
+              {statsApi.status === 'elevating' && '🛡 Correction config RL (validez l\'UAC)…'}
+              {statsApi.status === 'denied'    && '⚠ Config RL non corrigée — relancez en admin'}
+              {statsApi.status === 'not-found' && '⚠ Rocket League introuvable (Steam/Epic)'}
+            </div>
+          )}
+
           <div className="manager-divider" />
 
           {/* ── Mode édition ── */}
@@ -148,6 +177,34 @@ export default function PanelManager({ panels, onToggle, editMode, onToggleEdit,
               />
             </div>
           ))}
+
+          <div className="manager-divider" />
+
+          {/* ── Dashboard ── */}
+          <button
+            className="manager-action-btn manager-action-btn--dashboard"
+            onClick={() => window.electronAPI?.openDashboard()}
+          >
+            📊 Ouvrir le Dashboard
+          </button>
+
+          <div className="manager-divider" />
+
+          {/* ── Thème des animations ── */}
+          <div className="manager-row">
+            <span className="manager-row-label">✨ Animations</span>
+          </div>
+          <div className="manager-theme-picker">
+            {ANIM_THEMES.map(({ id, label }) => (
+              <button
+                key={id}
+                className={`manager-theme-btn ${animTheme === id ? 'manager-theme-btn--active' : ''} ${id === 'off' ? 'manager-theme-btn--off' : ''}`}
+                onClick={() => onChangeAnimTheme(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           <div className="manager-divider" />
 

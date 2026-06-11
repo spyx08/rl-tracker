@@ -24,6 +24,14 @@ export default function App() {
   const [editMode, setEditMode]     = useState(false);
   const [layoutKey, setLayoutKey]   = useState(0);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [animTheme, setAnimTheme]   = useState(
+    () => localStorage.getItem('rl_anim_theme') ?? 'neon'
+  );
+
+  const changeAnimTheme = (theme) => {
+    setAnimTheme(theme);
+    localStorage.setItem('rl_anim_theme', theme);
+  };
 
   // ── Écouter les événements de mise à jour depuis le main process ──────────
   useEffect(() => {
@@ -78,7 +86,7 @@ export default function App() {
 
   return (
     <GameProvider>
-      <AnimationOverlay />
+      <AnimationOverlay theme={animTheme} />
 
       {panels.hud && (
         <DraggablePanel key={`hud-${layoutKey}`} panelId="hud" title="HUD"
@@ -109,6 +117,8 @@ export default function App() {
         onToggleEdit={() => setEditMode(v => !v)}
         onReset={resetLayout}
         updateInfo={updateInfo}
+        animTheme={animTheme}
+        onChangeAnimTheme={changeAnimTheme}
       />
     </GameProvider>
   );

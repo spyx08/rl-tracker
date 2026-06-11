@@ -54,3 +54,44 @@ export const RANK_BANDS = raw.map(b => {
   tierIdx[b.tier] = (tierIdx[b.tier] ?? -1) + 1;
   return { ...b, tierIdx: tierIdx[b.tier] };
 });
+
+// Position d'un MMR dans son rang : division courante (1-4), progression dans
+// la division (0-1) et points restants jusqu'à la division/rang suivant.
+// Les bornes des divisions sont approximées en coupant le rang en 4 parts égales.
+export function getRankProgress(mmr) {
+  if (typeof mmr !== 'number' || mmr <= 0) return null;
+
+  let band = RANK_BANDS.find(b => mmr >= b.min && mmr <= b.max);
+  if (!band) {
+    // MMR dans un "trou" entre deux rangs : on le rattache au rang inférieur
+    band = [...RANK_BANDS].reverse().find(b => mmr > b.max) ?? RANK_BANDS[0];
+  }
+
+  const divSize = (band.max - band.min) / 4;
+  const division = Math.min(3, Math.max(0, Math.floor((mmr - band.min) / divSize)));
+  const divMin = band.min + division * divSize;
+  const progress = Math.min(1, Math.max(0, (mmr - divMin) / divSize));
+
+  const bandIdx = RANK_BANDS.indexOf(band);
+  const nextBand = RANK_BANDS[bandIdx + 1] ?? null;
+  let nextLabel = null;
+  let pointsToNext = null;
+  if (division < 3) {
+    nextLabel = `Div ${division + 2}`;
+    pointsToNext = Math.max(1, Math.ceil(divMin + divSize - mmr));
+  } else if (nextBand) {
+    nextLabel = nextBand.short;
+    pointsToNext = Math.max(1, Math.ceil(nextBand.min - mmr));
+  }
+  // SSL Div 4 : pas de "suivant", la barre affiche juste la progression
+
+  // Position d'un autre MMR (ex: début de session) dans LA MÊME division,
+  // pour afficher un repère sur la barre ; null s'il est hors de la division
+  const positionInDivision = (otherMmr) => {
+    if (typeof otherMmr !== 'number') return null;
+    const p = (otherMmr - divMin) / divSize;
+    return p >= 0 && p <= 1 ? p : null;
+  };
+
+  return { band, division: division + 1, progress, nextLabel, pointsToNext, positionInDivision };
+}
