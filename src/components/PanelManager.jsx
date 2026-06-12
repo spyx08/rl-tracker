@@ -35,6 +35,7 @@ export default function PanelManager({
   updateInfo,
   animTheme,
   onChangeAnimTheme,
+  onMenuOpen,
 }) {
   const { wsConnected, state } = useGame();
   const [open, setOpen] = useState(false);
@@ -131,7 +132,12 @@ export default function PanelManager({
 
         <button
           className={`manager-gear ${open ? "manager-gear--open" : ""}`}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => {
+            setOpen((v) => {
+              if (!v) onMenuOpen?.(); // signale chaque ouverture (pas la fermeture)
+              return !v;
+            });
+          }}
           title="Gérer les panneaux"
         >
           ⚙{hasUpdate && <span className="manager-update-badge" />}
@@ -140,13 +146,13 @@ export default function PanelManager({
 
       {open && (
         <div className="manager-popup">
-          <span
-            className={`manager-server-dot ${wsConnected ? "manager-server-dot--on" : "manager-server-dot--off"}`}
-            title={wsConnected ? "Serveur connecté" : "Serveur déconnecté"}
-          />
           {/* ── Version + statut update inline ── */}
           <div className="manager-version">
-            v{version}
+            <span
+              className={`manager-server-dot ${wsConnected ? "manager-server-dot--on" : "manager-server-dot--off"}`}
+              title={wsConnected ? "Serveur connecté" : "Serveur déconnecté"}
+            />
+            &nbsp;v{version}
             {updateInfo?.status === "checking" && (
               <span className="upd-badge" title="Vérification…">
                 {" "}
@@ -296,6 +302,15 @@ export default function PanelManager({
           </div>
 
           <div className="manager-divider" />
+
+          {/* Récupère les panneaux perdus hors écran : positions + visibilité */}
+          <button
+            className="manager-action-btn"
+            title="Replace tous les panneaux à leur position par défaut"
+            onClick={handleReset}
+          >
+            ↺ Réinitialiser la disposition
+          </button>
 
           <button
             className="manager-action-btn manager-action-btn--danger"

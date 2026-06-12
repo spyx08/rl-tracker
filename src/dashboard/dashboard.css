@@ -627,8 +627,13 @@
   background: rgba(74, 222, 128, 0.12);
 }
 
-/* Pendant la capture d'image du panneau : le bouton ne doit pas être visible */
-.dash-capturing .dash-share-btn { opacity: 0 !important; }
+/* Pendant la capture d'image du panneau : le bouton ne doit pas être visible.
+   visibility (non transitionné) plutôt qu'opacity : le fondu de 0.15s laissait
+   le bouton partiellement visible au moment du capturePage */
+.dash-capturing .dash-share-btn {
+  visibility: hidden !important;
+  transition: none !important;
+}
 
 /* ─── États vides ────────────────────────────────────────────────────────── */
 

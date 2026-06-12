@@ -10,7 +10,7 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function platformFromPrimaryId(primaryId) {
+export function platformFromPrimaryId(primaryId) {
   if (!primaryId) return "epic";
   const prefix = primaryId.split("|")[0].toLowerCase();
   const map = {

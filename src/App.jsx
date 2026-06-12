@@ -6,6 +6,7 @@ import SessionPanel from './components/SessionPanel.jsx';
 import LivePanel from './components/LivePanel.jsx';
 import DraggablePanel from './components/DraggablePanel.jsx';
 import PanelManager from './components/PanelManager.jsx';
+import AccountPicker from './components/AccountPicker.jsx';
 
 const DEFAULT_PANELS = { hud: true, session: true, live: true };
 const POS_KEYS = ['hud', 'session', 'live', 'manager'];
@@ -24,6 +25,9 @@ export default function App() {
   const [editMode, setEditMode]     = useState(false);
   const [layoutKey, setLayoutKey]   = useState(0);
   const [updateInfo, setUpdateInfo] = useState(null);
+  // Incrémenté à chaque ouverture du menu ⚙ — re-déclenche l'AccountPicker
+  // si aucun compte n'est encore sélectionné
+  const [menuOpenCount, setMenuOpenCount] = useState(0);
   const [animTheme, setAnimTheme]   = useState(
     () => localStorage.getItem('rl_anim_theme') ?? 'neon'
   );
@@ -60,7 +64,7 @@ export default function App() {
     };
 
     const onMove = (e) => {
-      apply(!e.target.closest('.draggable-panel, .panel-manager'));
+      apply(!e.target.closest('.draggable-panel, .panel-manager, .account-picker'));
     };
 
     document.addEventListener('mousemove', onMove);
@@ -90,24 +94,32 @@ export default function App() {
 
       {panels.hud && (
         <DraggablePanel key={`hud-${layoutKey}`} panelId="hud" title="HUD"
-          defaultPos={{ x: 20, y: 20 }} editMode={editMode}>
+          defaultPos={{ x: 20, y: 20 }} editMode={editMode}
+          onHide={() => togglePanel('hud')}>
           <Header />
         </DraggablePanel>
       )}
 
       {panels.session && (
         <DraggablePanel key={`session-${layoutKey}`} panelId="session" title="Session Stats"
-          defaultPos={{ x: 20, y: 95 }} editMode={editMode}>
+          defaultPos={{ x: 20, y: 95 }} editMode={editMode}
+          onHide={() => togglePanel('session')}>
           <SessionPanel />
         </DraggablePanel>
       )}
 
       {panels.live && (
         <DraggablePanel key={`live-${layoutKey}`} panelId="live" title="Live Game"
-          defaultPos={{ x: 20, y: 250 }} editMode={editMode}>
+          defaultPos={{ x: 20, y: 250 }} editMode={editMode}
+          onHide={() => togglePanel('live')}>
           <LivePanel />
         </DraggablePanel>
       )}
+
+      <AccountPicker
+        livePanelVisible={panels.live}
+        reopenSignal={menuOpenCount}
+      />
 
       <PanelManager
         key={`manager-${layoutKey}`}
@@ -119,6 +131,7 @@ export default function App() {
         updateInfo={updateInfo}
         animTheme={animTheme}
         onChangeAnimTheme={changeAnimTheme}
+        onMenuOpen={() => setMenuOpenCount(c => c + 1)}
       />
     </GameProvider>
   );
