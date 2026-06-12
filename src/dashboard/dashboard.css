@@ -77,6 +77,15 @@
   margin-bottom: 14px;
 }
 
+.dash-section-hint {
+  margin-left: 12px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: rgba(148, 163, 184, 0.6);
+}
+
 /* ─── Cartes stats par mode ──────────────────────────────────────────────── */
 
 .dash-mode-grid {
@@ -102,11 +111,31 @@
   height: 3px;
   background: linear-gradient(90deg, var(--mode-color), transparent 80%);
 }
+.dash-mode-card {
+  cursor: pointer;
+  user-select: none;
+}
 .dash-mode-card:hover {
   transform: translateY(-2px);
   border-color: var(--mode-color);
 }
+.dash-mode-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .dash-mode-card--empty { opacity: 0.55; }
+
+/* Mode désélectionné : exclu de l'historique et de l'analyse */
+.dash-mode-card--off {
+  opacity: 0.4;
+  filter: grayscale(0.75);
+  border-style: dashed;
+}
+.dash-mode-card--off::before { opacity: 0.35; }
+.dash-mode-card--off:hover {
+  opacity: 0.65;
+  filter: grayscale(0.4);
+}
 
 .dash-mode-card-head {
   display: flex;
@@ -205,6 +234,7 @@
 }
 
 .dash-insight {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -460,6 +490,53 @@
   color: var(--text-muted);
   border-top: 1px solid rgba(61, 84, 112, 0.4);
   padding-top: 9px;
+}
+
+/* ─── Bouton partager (révélé au survol des cartes) ──────────────────────── */
+
+.dash-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(61, 84, 112, 0.7);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  color: var(--text-main);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font);
+  line-height: 1;
+  padding: 5px 8px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.15s ease, transform 0.15s ease,
+    border-color 0.15s ease, background 0.15s ease;
+}
+.dash-share-btn--abs {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+.dash-share-btn--inline { margin-left: 6px; }
+
+.dash-mode-card:hover .dash-share-btn,
+.dash-insight:hover .dash-share-btn,
+.dash-session-card:hover .dash-share-btn,
+.dash-share-btn:focus-visible,
+.dash-share-btn--copied {
+  opacity: 1;
+  transform: translateY(0);
+}
+.dash-share-btn:hover {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.2);
+}
+.dash-share-btn--copied {
+  border-color: var(--win);
+  color: var(--win);
+  background: rgba(74, 222, 128, 0.12);
 }
 
 /* ─── États vides ────────────────────────────────────────────────────────── */

@@ -1,6 +1,7 @@
 const {
   app,
   BrowserWindow,
+  clipboard,
   ipcMain,
   screen,
   shell,
@@ -478,5 +479,9 @@ ipcMain.handle("statsapi-status-get", () => statsApiStatus);
 ipcMain.on("session-save", (_, record) => saveSession(record));
 ipcMain.handle("sessions-get", () => readSessions());
 ipcMain.on("open-dashboard", () => createDashboardWindow());
+
+// Copie fiable dans le presse-papiers : navigator.clipboard.writeText peut
+// être refusé dans le renderer Electron (permission clipboard-sanitized-write)
+ipcMain.on("copy-text", (_, text) => clipboard.writeText(String(text ?? "")));
 
 if (!app.requestSingleInstanceLock()) app.quit();

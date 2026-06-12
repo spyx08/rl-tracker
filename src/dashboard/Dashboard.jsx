@@ -34,6 +34,31 @@ function fmtDelta(n) {
   return n > 0 ? `+${n}` : `${n}`;
 }
 
+// Restreint les sessions aux modes sélectionnés : matchLog et mmrByMode
+// filtrés, W/L et nombre de matchs recalculés. Les sessions sans aucun match
+// dans les modes choisis disparaissent. (Les totaux buts/arrêts/etc. restent
+// ceux de la session entière — ils ne sont pas ventilés par mode.)
+function restrictSessions(sessions, selectedModes) {
+  if (selectedModes.size === MODE_ORDER.length) return sessions;
+  return sessions
+    .map((s) => {
+      const matchLog = (s.matchLog ?? []).filter((m) => selectedModes.has(m.mode));
+      if (matchLog.length === 0) return null;
+      const mmrByMode = Object.fromEntries(
+        Object.entries(s.mmrByMode ?? {}).filter(([m]) => selectedModes.has(m)),
+      );
+      return {
+        ...s,
+        matchLog,
+        mmrByMode,
+        wins: matchLog.filter((m) => m.result === 'win').length,
+        losses: matchLog.filter((m) => m.result === 'loss').length,
+        totalMatches: matchLog.length,
+      };
+    })
+    .filter(Boolean);
+}
+
 function fmtMonth(date) {
   const label = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return label.charAt(0).toUpperCase() + label.slice(1);
@@ -48,6 +73,114 @@ function fmtDay(ts) {
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ─── Partage Discord ──────────────────────────────────────────────────────────
+// Chaque carte expose un bouton (au survol) qui copie un message formaté en
+// markdown Discord, prêt à coller dans n'importe quel salon.
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+// Copie avec replis : le presse-papiers Electron (toujours fiable) en priorité,
+// sinon l'API navigateur (peut être refusée dans un renderer Electron),
+// sinon execCommand. Retourne true si la copie a réussi.
+async function copyToClipboard(text) {
+  if (window.electronAPI?.copyText) {
+    window.electronAPI.copyText(text);
+    return true;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch { /* on tente le repli execCommand */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function ShareButton({ buildText, inline = false }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async (e) => {
+    e.stopPropagation();
+    const ok = await copyToClipboard(buildText());
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  return (
+    <button
+      className={[
+        'dash-share-btn',
+        inline ? 'dash-share-btn--inline' : 'dash-share-btn--abs',
+        copied ? 'dash-share-btn--copied' : '',
+      ].join(' ')}
+      onClick={copy}
+      title="Copier le message pour Discord"
+    >
+      {copied ? '✓ Copié !' : <CopyIcon />}
+    </button>
+  );
+}
+
+function shareModeText(mode, stats) {
+  const meta = MODE_META[mode];
+  const winrate = stats.wins + stats.losses > 0
+    ? Math.round((stats.wins / (stats.wins + stats.losses)) * 100)
+    : null;
+  return [
+    `🎮 **${meta.label}** — stats RL Tracker`,
+    `📊 MMR cumulé : **${fmtDelta(stats.mmr)}**`,
+    `⚔️ ${stats.matches} matchs · **${stats.wins}V** / **${stats.losses}D**${winrate !== null ? ` · ${winrate}% de winrate` : ''}`,
+    `📅 ${stats.sessions} session${stats.sessions > 1 ? 's' : ''}`,
+  ].join('\n');
+}
+
+function shareInsightText(ins) {
+  return [
+    `${ins.icon} **${ins.title}** — analyse RL Tracker`,
+    `> **${ins.value}**`,
+    `> ${ins.detail}`,
+  ].join('\n');
+}
+
+function shareSessionText(session) {
+  const modes = sessionModes(session);
+  const winrate = session.wins + session.losses > 0
+    ? Math.round((session.wins / (session.wins + session.losses)) * 100)
+    : null;
+  const day = fmtDay(session.startedAt);
+  const lines = [
+    `🚀 **Session RL — ${day}**${session.username ? ` (${session.username})` : ''}`,
+    `🕐 ${fmtTime(session.startedAt)} → ${fmtTime(session.endedAt)} · ${sessionDuration(session)}`,
+    `🏁 **${session.wins}V – ${session.losses}D**${winrate !== null ? ` (${winrate}% de winrate)` : ''}`,
+  ];
+  const modeLine = modes
+    .map((m) => `${MODE_META[m].short} **${fmtDelta(mmrDelta(session.mmrByMode?.[m]))} MMR**`)
+    .join(' · ');
+  if (modeLine) lines.push(`📊 ${modeLine}`);
+  lines.push(
+    `⚽ ${session.totalGoals} buts · 🅰️ ${session.totalAssists} passes · 🧤 ${session.totalSaves} arrêts · ★ ${session.totalMVPs} MVP`,
+  );
+  return lines.join('\n');
 }
 
 // ─── Sparkline MMR (SVG inline) ───────────────────────────────────────────────
@@ -98,7 +231,7 @@ function computeModeStats(sessions) {
   return stats;
 }
 
-function ModeStatCard({ mode, stats }) {
+function ModeStatCard({ mode, stats, selected, onToggle }) {
   const meta = MODE_META[mode];
   const winrate = stats.wins + stats.losses > 0
     ? Math.round((stats.wins / (stats.wins + stats.losses)) * 100)
@@ -106,8 +239,30 @@ function ModeStatCard({ mode, stats }) {
   const empty = stats.matches === 0 && stats.mmr === 0;
 
   return (
-    <div className={`dash-mode-card ${empty ? 'dash-mode-card--empty' : ''}`}
-      style={{ '--mode-color': meta.color }}>
+    <div
+      className={[
+        'dash-mode-card',
+        empty ? 'dash-mode-card--empty' : '',
+        selected ? '' : 'dash-mode-card--off',
+      ].join(' ')}
+      style={{ '--mode-color': meta.color }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      title={selected
+        ? `Masquer le ${meta.label} de l'historique et de l'analyse`
+        : `Réafficher le ${meta.label}`}
+      onClick={() => onToggle(mode)}
+      onKeyDown={(e) => {
+        // e.target === e.currentTarget : ignore les Enter/Espace venant du
+        // bouton copier interne
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onToggle(mode);
+        }
+      }}
+    >
+      {!empty && <ShareButton buildText={() => shareModeText(mode, stats)} />}
       <div className="dash-mode-card-head">
         <span className="dash-mode-chip">{meta.short}</span>
         <span className="dash-mode-name">{meta.label}</span>
@@ -180,6 +335,7 @@ function SessionCard({ session }) {
           <span className="dash-score-sep">–</span>
           <span className="text-down">{session.losses}D</span>
           {winrate !== null && <span className="dash-session-wr">{winrate}%</span>}
+          <ShareButton inline buildText={() => shareSessionText(session)} />
         </div>
       </div>
 
@@ -220,6 +376,20 @@ export default function Dashboard() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [search, setSearch] = useState('');
+  // Modes affichés dans l'historique et l'analyse — tous par défaut,
+  // toujours au moins un de sélectionné
+  const [selectedModes, setSelectedModes] = useState(() => new Set(MODE_ORDER));
+
+  const toggleMode = (mode) =>
+    setSelectedModes((prev) => {
+      const next = new Set(prev);
+      if (next.has(mode)) {
+        if (next.size > 1) next.delete(mode); // jamais moins de 1
+      } else {
+        next.add(mode);
+      }
+      return next;
+    });
 
   const loadSessions = async () => {
     let list = (await window.electronAPI?.getSessions()) ?? null;
@@ -243,14 +413,20 @@ export default function Dashboard() {
   }, []);
 
   const allSessions = sessions ?? [];
+  // Les cartes par mode affichent toujours les stats complètes (ce sont les
+  // sélecteurs) ; historique et analyse suivent les modes sélectionnés
   const globalStats = useMemo(() => computeModeStats(allSessions), [allSessions]);
-  const insights    = useMemo(() => computeInsights(allSessions), [allSessions]);
+  const visibleSessions = useMemo(
+    () => restrictSessions(allSessions, selectedModes),
+    [allSessions, selectedModes],
+  );
+  const insights = useMemo(() => computeInsights(visibleSessions), [visibleSessions]);
 
   // Sessions du mois affiché, filtrées par recherche, les plus récentes en premier
   const monthSessions = useMemo(() => {
     const start = monthCursor.getTime();
     const end = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1).getTime();
-    let list = allSessions.filter((s) => s.startedAt >= start && s.startedAt < end);
+    let list = visibleSessions.filter((s) => s.startedAt >= start && s.startedAt < end);
 
     const q = search.trim().toLowerCase();
     if (q) {
@@ -264,7 +440,7 @@ export default function Dashboard() {
       });
     }
     return [...list].sort((a, b) => b.startedAt - a.startedAt);
-  }, [allSessions, monthCursor, search]);
+  }, [visibleSessions, monthCursor, search]);
 
   // Groupement par jour pour la timeline
   const days = useMemo(() => {
@@ -302,10 +478,21 @@ export default function Dashboard() {
 
       {/* ── Stats globales par mode ── */}
       <section className="dash-section">
-        <h2 className="dash-section-title">Stats globales par mode</h2>
+        <h2 className="dash-section-title">
+          Stats globales par mode
+          <span className="dash-section-hint">
+            Clique sur un mode pour filtrer l'historique et l'analyse
+          </span>
+        </h2>
         <div className="dash-mode-grid">
           {MODE_ORDER.map((mode) => (
-            <ModeStatCard key={mode} mode={mode} stats={globalStats[mode]} />
+            <ModeStatCard
+              key={mode}
+              mode={mode}
+              stats={globalStats[mode]}
+              selected={selectedModes.has(mode)}
+              onToggle={toggleMode}
+            />
           ))}
         </div>
       </section>
@@ -317,6 +504,7 @@ export default function Dashboard() {
           <div className="dash-insights-grid">
             {insights.map((ins) => (
               <div key={ins.title} className={`dash-insight dash-insight--${ins.tone}`}>
+                <ShareButton buildText={() => shareInsightText(ins)} />
                 <span className="dash-insight-icon">{ins.icon}</span>
                 <div className="dash-insight-body">
                   <span className="dash-insight-title">{ins.title}</span>

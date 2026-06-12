@@ -30,4 +30,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('sessions-updated', handler);
     return () => ipcRenderer.removeListener('sessions-updated', handler);
   },
+  copyText: (text) => ipcRenderer.send('copy-text', text),
 });
