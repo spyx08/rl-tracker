@@ -2,7 +2,9 @@ import { memo } from 'react';
 import { RANK_BANDS, TIER_FILLS, TIER_LABEL_COLORS } from '../utils/rankBands.js';
 
 const VW  = 320;          // viewBox width (unités SVG)
-const PAD = { t: 8, r: 10, b: 18, l: 36 };
+// Pas de gouttière latérale : la courbe court d'un bord à l'autre du panel
+// (les bandes de rang + le badge MMR portent l'information de l'axe Y)
+const PAD = { t: 8, r: 0, b: 14, l: 0 };
 
 const COLOR_LINE = '#f97316';
 const COLOR_UP   = '#4ade80';
@@ -107,9 +109,6 @@ function MmrChart({ mmrHistory, height = 88 }) {
         </filter>
       </defs>
 
-      {/* Fond du graphique */}
-      <rect x={PAD.l} y={PAD.t} width={cW} height={cH} fill="rgba(0,0,0,0.25)" rx="3" />
-
       {/* Bandes de rang */}
       {bands.map(b => {
         const fill       = TIER_FILLS[b.tier][b.tierIdx % 2];
@@ -202,27 +201,6 @@ function MmrChart({ mmrHistory, height = 88 }) {
         {current}
         <tspan fill={deltaColor}> {deltaStr}</tspan>
       </text>
-
-      {/* Axes */}
-      <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + cH}
-        stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
-      <line x1={PAD.l} y1={PAD.t + cH} x2={PAD.l + cW} y2={PAD.t + cH}
-        stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
-
-      {/* Étiquettes Y */}
-      {ticks.map(v => (
-        <text
-          key={`lbl-${v}`}
-          x={PAD.l - 3}
-          y={yOf(v) + 3.5}
-          fontSize="7"
-          fill="rgba(255,255,255,0.45)"
-          textAnchor="end"
-          fontFamily="monospace"
-        >
-          {v}
-        </text>
-      ))}
 
       {/* Étiquette X : nombre de matchs */}
       <text

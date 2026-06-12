@@ -211,23 +211,64 @@ function shareSessionText(session) {
   return lines.join('\n');
 }
 
-// ─── Sparkline MMR (SVG inline) ───────────────────────────────────────────────
+// ─── Chart MMR de session (pleine largeur, courbe lissée) ─────────────────────
 
-function Sparkline({ history, color }) {
+// Courbe lissée (Catmull-Rom → Bézier) passant par tous les points
+function smoothPath(pts) {
+  let d = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+}
+
+// Courbe MMR en fond de carte (position absolute via .dash-card-bgchart) :
+// la courbe occupe la moitié basse pour ne pas gêner la lecture du contenu
+function SessionChart({ history, color, id, topPad = 15, bottomPad = 2 }) {
   if (!history || history.length < 2) return null;
-  const w = 120, h = 32, pad = 3;
+  const w = 100, h = 30;
   const min = Math.min(...history);
   const max = Math.max(...history);
   const range = max - min || 1;
-  const pts = history.map((v, i) => {
-    const x = pad + (i / (history.length - 1)) * (w - pad * 2);
-    const y = h - pad - ((v - min) / range) * (h - pad * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
+  const pts = history.map((v, i) => [
+    +((i / (history.length - 1)) * w).toFixed(2),
+    +(h - bottomPad - ((v - min) / range) * (h - topPad - bottomPad)).toFixed(2),
+  ]);
+  const line = smoothPath(pts);
+  const area = `${line} L ${w},${h} L 0,${h} Z`;
+  const gid = `sessgrad_${id}`;
+
   return (
-    <svg className="dash-sparkline" viewBox={`0 0 ${w} ${h}`} width={w} height={h}>
-      <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="2"
-        strokeLinejoin="round" strokeLinecap="round" />
+    <svg
+      className="dash-card-bgchart"
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.30" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path
+        d={line}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   );
 }
@@ -259,7 +300,7 @@ function computeModeStats(sessions) {
   return stats;
 }
 
-function ModeStatCard({ mode, stats, selected, onToggle }) {
+function ModeStatCard({ mode, stats, selected, onToggle, bgHistory }) {
   const meta = MODE_META[mode];
   const winrate = stats.wins + stats.losses > 0
     ? Math.round((stats.wins / (stats.wins + stats.losses)) * 100)
@@ -290,6 +331,9 @@ function ModeStatCard({ mode, stats, selected, onToggle }) {
         }
       }}
     >
+      {bgHistory && (
+        <SessionChart history={bgHistory} color={meta.color} id={`mode_${mode}`} />
+      )}
       {!empty && <ShareButton buildText={() => shareModeText(mode, stats)} />}
       <div className="dash-mode-card-head">
         <span className="dash-mode-chip">{meta.short}</span>
@@ -348,6 +392,13 @@ function SessionCard({ session }) {
 
   return (
     <div className="dash-session-card">
+      {mainHistory && (
+        <SessionChart
+          history={mainHistory}
+          color={MODE_META[mainMode]?.color ?? '#60a5fa'}
+          id={session.id}
+        />
+      )}
       <div className="dash-session-head">
         <div className="dash-session-when">
           <span className="dash-session-time">
@@ -378,9 +429,6 @@ function SessionCard({ session }) {
             </span>
           );
         })}
-        {mainHistory && (
-          <Sparkline history={mainHistory} color={MODE_META[mainMode]?.color ?? '#60a5fa'} />
-        )}
       </div>
 
       <div className="dash-session-stats">
@@ -407,6 +455,9 @@ export default function Dashboard() {
   // Modes affichés dans l'historique et l'analyse — tous par défaut,
   // toujours au moins un de sélectionné
   const [selectedModes, setSelectedModes] = useState(() => new Set(MODE_ORDER));
+  // Comptes affichés — null = tous (les sessions chargent en async, on ne
+  // connaît la liste qu'après coup) ; toujours au moins un de sélectionné
+  const [accountFilter, setAccountFilter] = useState(null);
 
   const toggleMode = (mode) =>
     setSelectedModes((prev) => {
@@ -441,12 +492,57 @@ export default function Dashboard() {
   }, []);
 
   const allSessions = sessions ?? [];
-  // Les cartes par mode affichent toujours les stats complètes (ce sont les
-  // sélecteurs) ; historique et analyse suivent les modes sélectionnés
-  const globalStats = useMemo(() => computeModeStats(allSessions), [allSessions]);
+
+  // Comptes distincts rencontrés dans l'historique
+  const usernames = useMemo(() => {
+    const set = new Set(allSessions.map((s) => s.username).filter(Boolean));
+    return [...set].sort();
+  }, [allSessions]);
+
+  const selectedAccounts = accountFilter ?? new Set(usernames);
+
+  const toggleAccount = (name) =>
+    setAccountFilter((prev) => {
+      const next = new Set(prev ?? usernames);
+      if (next.has(name)) {
+        if (next.size > 1) next.delete(name); // jamais moins de 1
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+
+  // Le filtre compte s'applique à tout (stats par mode, analyse, historique) ;
+  // les cartes par mode restent les sélecteurs du filtre mode
+  const accountSessions = useMemo(
+    () => (accountFilter
+      ? allSessions.filter((s) => accountFilter.has(s.username))
+      : allSessions),
+    [allSessions, accountFilter],
+  );
+
+  const globalStats = useMemo(() => computeModeStats(accountSessions), [accountSessions]);
+
+  // Courbe MMR de fond des cartes de mode — seulement quand un seul compte
+  // est affiché (mélanger les ladders de plusieurs comptes n'a pas de sens)
+  const singleAccount = usernames.length <= 1 || selectedAccounts.size === 1;
+  const modeHistories = useMemo(() => {
+    if (!singleAccount) return null;
+    const sorted = [...accountSessions].sort((a, b) => a.startedAt - b.startedAt);
+    const result = {};
+    for (const mode of MODE_ORDER) {
+      const concat = [];
+      for (const s of sorted) {
+        const hist = s.mmrByMode?.[mode]?.history;
+        if (hist?.length) concat.push(...hist);
+      }
+      result[mode] = concat.length >= 2 ? concat : null;
+    }
+    return result;
+  }, [accountSessions, singleAccount]);
   const visibleSessions = useMemo(
-    () => restrictSessions(allSessions, selectedModes),
-    [allSessions, selectedModes],
+    () => restrictSessions(accountSessions, selectedModes),
+    [accountSessions, selectedModes],
   );
   const insights = useMemo(() => computeInsights(visibleSessions), [visibleSessions]);
 
@@ -464,7 +560,15 @@ export default function Dashboard() {
           .join(' ');
         const day = new Date(s.startedAt)
           .toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-        return `${s.username ?? ''} ${modes} ${day}`.toLowerCase().includes(q);
+        // Coéquipiers et adversaires rencontrés pendant la session
+        const players = new Set();
+        for (const m of s.matchLog ?? []) {
+          (m.teammates ?? []).forEach((n) => players.add(n));
+          (m.opponents ?? []).forEach((n) => players.add(n));
+        }
+        return `${s.username ?? ''} ${modes} ${day} ${[...players].join(' ')}`
+          .toLowerCase()
+          .includes(q);
       });
     }
     return [...list].sort((a, b) => b.startedAt - a.startedAt);
@@ -532,6 +636,24 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
+        {/* Filtre par compte — visible seulement si plusieurs comptes */}
+        {usernames.length > 1 && (
+          <div className="dash-accounts" title="Comptes affichés (clique pour filtrer)">
+            {usernames.map((name) => {
+              const active = selectedAccounts.has(name);
+              return (
+                <button
+                  key={name}
+                  className={`dash-account-chip ${active ? 'dash-account-chip--active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => toggleAccount(name)}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </header>
 
       {/* ── Stats globales par mode ── */}
@@ -550,6 +672,7 @@ export default function Dashboard() {
               stats={globalStats[mode]}
               selected={selectedModes.has(mode)}
               onToggle={toggleMode}
+              bgHistory={modeHistories?.[mode]}
             />
           ))}
         </div>
@@ -588,7 +711,7 @@ export default function Dashboard() {
             <input
               className="dash-search"
               type="search"
-              placeholder="Rechercher (mode, joueur, jour…)"
+              placeholder="Rechercher (mode, coéquipier, adversaire, jour…)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

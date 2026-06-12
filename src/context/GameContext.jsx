@@ -61,6 +61,24 @@ function detectLocalPlayer(gameData) {
   return null;
 }
 
+// Sépare les noms des coéquipiers / adversaires — stockés dans le matchLog
+// pour la recherche du dashboard et les insights "meilleur/pire coéquipier"
+function splitTeams(players, username, myTeamNum) {
+  const teammates = [];
+  const opponents = [];
+  if (myTeamNum == null) return { teammates, opponents };
+  for (const p of players ?? []) {
+    if (!p.Name || p.Name === username) continue;
+    if (p.TeamNum === myTeamNum) teammates.push(p.Name);
+    else opponents.push(p.Name);
+  }
+  return { teammates, opponents };
+}
+
+// Délai avant de déduire le mode de jeu en début de partie : les joueurs
+// rejoignent progressivement, sans délai un 3v3 s'affiche d'abord en 1v1/2v2
+const GAMEMODE_DETECT_DELAY_MS = 8000;
+
 // ─── Session snapshot (persistance localStorage) ─────────────────────────────
 // Les stats de session ne vivent que dans le reducer : sans snapshot elles sont
 // perdues sur crash, mise à jour auto (quitAndInstall) ou fermeture non propre.
@@ -140,6 +158,9 @@ const initialState = {
   // Timestamp du dernier match comptabilisé (MatchEnded ou forfait) —
   // sert d'anti double-comptage, jamais persisté
   lastCountedAt: 0,
+  // Premier UpdateState du match en cours — la détection du mode de jeu
+  // attend GAMEMODE_DETECT_DELAY_MS après cet instant (jamais persisté)
+  matchStartedAt: 0,
 
   // Joueur détecté (null = pas encore identifié)
   username: savedUsername,
@@ -254,7 +275,12 @@ function gameReducer(state, action) {
           lastCountedAt: now,
           matchLog: [
             ...state.matchLog,
-            { ts: now, mode: state.gameMode, result: won ? "win" : "loss" },
+            {
+              ts: now,
+              mode: state.gameMode,
+              result: won ? "win" : "loss",
+              ...splitTeams(state.lastPlayers, state.username, state.myCurrentTeamNum),
+            },
           ],
           ...(won
             ? { wins: state.wins + 1, streak: state.streak > 0 ? state.streak + 1 : 1 }
@@ -268,6 +294,7 @@ function gameReducer(state, action) {
         matchAlreadyCounted: false,
         lastPlayers: [],
         matchMaxPlayers: 0,
+        matchStartedAt: 0,
         gameMode: null,   // reset pour que la détection du prochain mode triggere bien l'effet MMR
         livePlayers: [],
         liveTeams: [],
@@ -310,15 +337,34 @@ function gameReducer(state, action) {
         }
       }
 
+      // Début d'un nouveau match observé (lastPlayers vidé par MATCH_RESET) :
+      // démarre la fenêtre d'attente avant la détection du mode
+      if (state.lastPlayers.length === 0 && players.length > 0) {
+        next.matchStartedAt = Date.now();
+      }
+
       const maxTeamSize = Math.max(
         players.filter((p) => p.TeamNum === 0).length,
         players.filter((p) => p.TeamNum === 1).length,
       );
       if (maxTeamSize > state.matchMaxPlayers) {
         next.matchMaxPlayers = maxTeamSize;
-        if (maxTeamSize === 1) next.gameMode = "duel";
-        else if (maxTeamSize === 2) next.gameMode = "double";
-        else next.gameMode = "standard";
+      }
+
+      // Le mode n'est déduit qu'après GAMEMODE_DETECT_DELAY_MS : les joueurs
+      // rejoignent la partie progressivement, la taille des équipes des
+      // premières secondes n'est pas fiable (un 3v3 commence en "1v1")
+      const startedAt = next.matchStartedAt || state.matchStartedAt;
+      if (
+        next.matchMaxPlayers > 0 &&
+        startedAt > 0 &&
+        Date.now() - startedAt >= GAMEMODE_DETECT_DELAY_MS
+      ) {
+        const mode =
+          next.matchMaxPlayers === 1 ? "duel"
+          : next.matchMaxPlayers === 2 ? "double"
+          : "standard";
+        if (mode !== state.gameMode) next.gameMode = mode;
       }
 
       next.lastPlayers = players;
@@ -335,7 +381,12 @@ function gameReducer(state, action) {
 
       const logMatch = (result) => [
         ...state.matchLog,
-        { ts: Date.now(), mode: state.gameMode, result },
+        {
+          ts: Date.now(),
+          mode: state.gameMode,
+          result,
+          ...splitTeams(finalPlayers, state.username, state.myCurrentTeamNum),
+        },
       ];
 
       let next = {

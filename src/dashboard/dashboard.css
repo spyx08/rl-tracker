@@ -64,6 +64,37 @@
   margin-top: 2px;
 }
 
+/* ─── Filtre par compte ──────────────────────────────────────────────────── */
+
+.dash-accounts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dash-account-chip {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: var(--font);
+  color: var(--text-muted);
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px dashed rgba(61, 84, 112, 0.55);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, border-color 0.15s, color 0.15s, background 0.15s;
+}
+.dash-account-chip:hover { opacity: 0.85; }
+.dash-account-chip--active {
+  color: var(--text-main);
+  border-style: solid;
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.18);
+  opacity: 1;
+}
+
 /* ─── Sections ───────────────────────────────────────────────────────────── */
 
 .dash-section { margin-bottom: 34px; }
@@ -401,6 +432,7 @@
 /* ─── Carte session ──────────────────────────────────────────────────────── */
 
 .dash-session-card {
+  position: relative;
   background: rgba(30, 41, 59, 0.55);
   border: 1px solid rgba(61, 84, 112, 0.55);
   border-radius: 14px;
@@ -476,9 +508,18 @@
   padding: 3px 8px;
 }
 
-.dash-sparkline {
-  margin-left: auto;
-  opacity: 0.9;
+/* Courbe MMR en fond de carte (sessions + cartes de mode).
+   z-index:-1 reste au-dessus du fond de la carte mais sous son contenu —
+   les cartes créent leur propre stacking context via backdrop-filter */
+.dash-card-bgchart {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .dash-session-stats {

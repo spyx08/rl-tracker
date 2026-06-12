@@ -202,6 +202,42 @@ export function computeInsights(sessions) {
     });
   }
 
+  // ── Meilleur / pire coéquipier ──
+  // (matchLog.teammates — présent sur les sessions enregistrées depuis la v2.2)
+  const mates = new Map();
+  for (const m of matches) {
+    for (const name of m.teammates ?? []) {
+      const b = mates.get(name) ?? { wins: 0, losses: 0, count: 0 };
+      if (m.result === 'win') b.wins++;
+      else if (m.result === 'loss') b.losses++;
+      b.count++;
+      mates.set(name, b);
+    }
+  }
+  const mateList = [...mates.entries()].map(([name, b]) => ({ name, ...b }));
+  const bestMate = mateList
+    .filter((b) => b.wins >= 2)
+    .sort((a, b) => b.wins - a.wins || winrate(b) - winrate(a))[0];
+  if (bestMate) {
+    insights.push({
+      icon: '🤝', tone: 'up',
+      title: 'Meilleur coéquipier',
+      value: bestMate.name,
+      detail: `${bestMate.wins} wins ensemble · ${winrate(bestMate)}% de wins sur ${bestMate.count} matchs`,
+    });
+  }
+  const worstMate = mateList
+    .filter((b) => b.losses >= 2 && b.name !== bestMate?.name)
+    .sort((a, b) => b.losses - a.losses || winrate(a) - winrate(b))[0];
+  if (worstMate) {
+    insights.push({
+      icon: '🫠', tone: 'down',
+      title: 'Coéquipier maudit',
+      value: worstMate.name,
+      detail: `${worstMate.losses} défaites ensemble · ${winrate(worstMate)}% de wins sur ${worstMate.count} matchs`,
+    });
+  }
+
   // ── Mental après défaite (détecteur de tilt) ──
   let afterLoss = 0, afterLossWins = 0;
   let prev = null;
