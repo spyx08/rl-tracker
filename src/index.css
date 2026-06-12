@@ -972,23 +972,25 @@ body {
   top: 31%;
 }
 
+/* La durée vient de --anim-duration, posée par AnimationOverlay.jsx
+   (ANIM_DURATION_MS) — un seul endroit à modifier pour ajuster */
 .anim-goal .anim-backdrop {
   background: #1e293b;
   border-top: 3px solid #3b82f6;
   border-bottom: 3px solid #3b82f6;
-  animation: backdropOpen 4s ease forwards;
+  animation: backdropOpen var(--anim-duration, 4s) ease forwards;
 }
 .anim-my-goal .anim-backdrop {
   background: #0d2319;
   border-top: 3px solid #10b981;
   border-bottom: 3px solid #10b981;
-  animation: backdropOpen 4s ease forwards;
+  animation: backdropOpen var(--anim-duration, 4s) ease forwards;
 }
 .anim-win .anim-backdrop {
   background: #1a1300;
   border-top: 3px solid #fbbf24;
   border-bottom: 3px solid #fbbf24;
-  animation: backdropOpen 6.5s ease forwards;
+  animation: backdropOpen var(--anim-duration, 6.5s) ease forwards;
 }
 
 @keyframes backdropOpen {
@@ -1261,10 +1263,7 @@ body {
     transparent 2px,
     transparent 5px
   );
-  animation: backdropOpen 4s ease forwards;
-}
-.anim-win .anim-scanlines {
-  animation-duration: 6.5s;
+  animation: backdropOpen var(--anim-duration, 4s) ease forwards;
 }
 
 @keyframes retroFlicker {
