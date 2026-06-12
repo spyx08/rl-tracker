@@ -366,6 +366,9 @@ function createDashboardWindow() {
     minHeight: 560,
     backgroundColor: "#0b1220",
     autoHideMenuBar: true,
+    // Pas de barre de titre Windows : le dashboard affiche ses propres
+    // boutons agrandir/fermer et une zone de drag en haut de la fenêtre
+    frame: false,
     title: "RL Overlay — Dashboard",
     icon: path.join(__dirname, "assets/icon.png"),
     webPreferences: {
@@ -483,5 +486,38 @@ ipcMain.on("open-dashboard", () => createDashboardWindow());
 // Copie fiable dans le presse-papiers : navigator.clipboard.writeText peut
 // être refusé dans le renderer Electron (permission clipboard-sanitized-write)
 ipcMain.on("copy-text", (_, text) => clipboard.writeText(String(text ?? "")));
+
+// Capture une zone de la fenêtre appelante (rect en pixels CSS) et place
+// l'image dans le presse-papiers — utilisé pour partager un panneau du
+// dashboard. Retourne true si la capture a réussi.
+ipcMain.handle("copy-panel-image", async (event, rect) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || !rect) return false;
+    const image = await win.webContents.capturePage({
+      x: Math.max(0, Math.round(rect.x)),
+      y: Math.max(0, Math.round(rect.y)),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
+    if (image.isEmpty()) return false;
+    clipboard.writeImage(image);
+    return true;
+  } catch (e) {
+    console.error("copy-panel-image:", e);
+    return false;
+  }
+});
+
+// Contrôles de la fenêtre dashboard (sans frame Windows)
+ipcMain.on("dashboard-window-control", (event, action) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  if (action === "close") win.close();
+  else if (action === "maximize") {
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+  }
+});
 
 if (!app.requestSingleInstanceLock()) app.quit();

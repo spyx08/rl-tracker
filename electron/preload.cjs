@@ -31,4 +31,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('sessions-updated', handler);
   },
   copyText: (text) => ipcRenderer.send('copy-text', text),
+  copyPanelImage: (rect) => ipcRenderer.invoke('copy-panel-image', rect),
+  dashWindowControl: (action) => ipcRenderer.send('dashboard-window-control', action),
 });

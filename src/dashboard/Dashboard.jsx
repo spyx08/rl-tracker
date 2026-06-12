@@ -116,11 +116,39 @@ async function copyToClipboard(text) {
   }
 }
 
+const CARD_SELECTOR = '.dash-mode-card, .dash-insight, .dash-session-card';
+
+// Capture le panneau en image dans le presse-papiers via Electron
+// (capturePage sur le rect de la carte — rendu identique à l'écran).
+// Le bouton copier est masqué le temps de la capture.
+async function copyCardImage(card) {
+  if (!window.electronAPI?.copyPanelImage) return false;
+  card.classList.add('dash-capturing');
+  // Deux frames pour que le masquage du bouton soit peint avant la capture —
+  // avec timeout de secours (rAF est suspendu si la fenêtre n'est pas visible)
+  await new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    requestAnimationFrame(() => requestAnimationFrame(finish));
+    setTimeout(finish, 80);
+  });
+  try {
+    const { x, y, width, height } = card.getBoundingClientRect();
+    return await window.electronAPI.copyPanelImage({ x, y, width, height });
+  } finally {
+    card.classList.remove('dash-capturing');
+  }
+}
+
 function ShareButton({ buildText, inline = false }) {
   const [copied, setCopied] = useState(false);
   const copy = async (e) => {
     e.stopPropagation();
-    const ok = await copyToClipboard(buildText());
+    const card = e.currentTarget.closest(CARD_SELECTOR);
+    // Image du panneau dans l'app Electron ; texte formaté en repli (dev navigateur)
+    const ok = card && window.electronAPI?.copyPanelImage
+      ? await copyCardImage(card)
+      : await copyToClipboard(buildText());
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -134,7 +162,7 @@ function ShareButton({ buildText, inline = false }) {
         copied ? 'dash-share-btn--copied' : '',
       ].join(' ')}
       onClick={copy}
-      title="Copier le message pour Discord"
+      title="Copier l'image du panneau (à coller dans Discord)"
     >
       {copied ? '✓ Copié !' : <CopyIcon />}
     </button>
@@ -462,8 +490,38 @@ export default function Dashboard() {
   const shiftMonth = (delta) =>
     setMonthCursor((d) => new Date(d.getFullYear(), d.getMonth() + delta, 1));
 
+  const hasWindowControls = !!window.electronAPI?.dashWindowControl;
+
   return (
     <div className="dashboard">
+      {/* Fenêtre sans frame Windows : zone de drag + boutons agrandir/fermer */}
+      {hasWindowControls && (
+        <>
+          <div className="dash-drag-strip" aria-hidden="true" />
+          <div className="dash-window-controls">
+            <button
+              title="Agrandir / restaurer"
+              onClick={() => window.electronAPI.dashWindowControl('maximize')}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                stroke="currentColor" strokeWidth="1.4">
+                <rect x="1.5" y="1.5" width="9" height="9" rx="1" />
+              </svg>
+            </button>
+            <button
+              className="dash-wc-close"
+              title="Fermer"
+              onClick={() => window.electronAPI.dashWindowControl('close')}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
+              </svg>
+            </button>
+          </div>
+        </>
+      )}
+
       <header className="dash-header">
         <div className="dash-title">
           <span className="dash-logo">🚀</span>
