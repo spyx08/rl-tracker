@@ -79,6 +79,12 @@ function splitTeams(players, username, myTeamNum) {
 // rejoignent progressivement, sans délai un 3v3 s'affiche d'abord en 1v1/2v2
 const GAMEMODE_DETECT_DELAY_MS = 8000;
 
+// Délai avant de conclure qu'un compte stocké est absent de la partie. Le
+// roster se remplit progressivement : sans ce délai, un UpdateState initial
+// où le joueur n'est pas encore chargé le ferait passer pour "compte changé"
+// et déclencherait un reset + re-choix de compte en pleine session.
+const ACCOUNT_VERIFY_DELAY_MS = 8000;
+
 // ─── Session snapshot (persistance localStorage) ─────────────────────────────
 // Les stats de session ne vivent que dans le reducer : sans snapshot elles sont
 // perdues sur crash, mise à jour auto (quitAndInstall) ou fermeture non propre.
@@ -587,6 +593,9 @@ function useRLWebSocket(
 
   // Armé à true à chaque nouveau match pour relancer la détection même si un username est déjà stocké
   const needsRedetectionRef = useRef(true);
+  // Horodatage du 1er UpdateState où le compte stocké est introuvable : sert à
+  // tolérer le remplissage progressif du roster avant de conclure "compte absent"
+  const redetectStartedAtRef = useRef(0);
 
   // setPlayer est stable (useCallback) — pas besoin de ref
   useEffect(() => {
@@ -620,6 +629,7 @@ function useRLWebSocket(
               dispatch({ type: "MATCH_RESET" });
               // Réarme la détection : le compte connecté a peut-être changé depuis la dernière partie
               needsRedetectionRef.current = true;
+              redetectStartedAtRef.current = 0;
               break;
 
             case "UpdateState": {
@@ -629,13 +639,17 @@ function useRLWebSocket(
               const teams = gameData.Game?.Teams ?? null;
               const game = gameData.Game ?? {};
 
-              // Relance la détection au début de chaque nouveau match (pas seulement si username est vide)
+              // Détection / vérification du compte au début de chaque match.
+              // Tolérant au remplissage progressif du roster : on ne conclut
+              // "compte absent" qu'après ACCOUNT_VERIFY_DELAY_MS, sinon un
+              // joueur pas encore chargé déclencherait à tort un reset de session.
               if (needsRedetectionRef.current) {
-                needsRedetectionRef.current = false; // ne tenter qu'une fois par match
                 const detected = detectLocalPlayer(gameData);
 
                 if (detected) {
                   // Champ explicite trouvé dans l'event — source fiable
+                  needsRedetectionRef.current = false;
+                  redetectStartedAtRef.current = 0;
                   if (detected.name !== usernameRef.current) {
                     console.log(
                       `🔄 Changement de compte détecté : ${usernameRef.current} → ${detected.name} (${detected.platform})`,
@@ -655,13 +669,34 @@ function useRLWebSocket(
                   }
                 } else if (!usernameRef.current) {
                   // Aucun champ auto-détectable et pas d'username stocké → UI de sélection
+                  needsRedetectionRef.current = false;
+                  redetectStartedAtRef.current = 0;
                   console.log("⚠️ Impossible de détecter le joueur local automatiquement");
-                }
-                // Si detected === null mais usernameRef.current existe :
-                // le jeu n'expose pas bLocalPlayer → on garde l'username stocké
-                // mais on dispatche CHECK_PLAYER pour vérifier qu'il est bien dans la partie
-                if (!detected && usernameRef.current) {
-                  dispatch({ type: "CHECK_PLAYER", payload: { players } });
+                } else {
+                  // Username stocké, pas de bLocalPlayer : on vérifie sa présence.
+                  // Le roster se remplit progressivement, donc tant que le joueur
+                  // n'est pas trouvé on retente aux UpdateState suivants, et on ne
+                  // le marque "absent" qu'au-delà du délai (= vrai changement).
+                  const found = players.some((p) => p.Name === usernameRef.current);
+                  if (found) {
+                    needsRedetectionRef.current = false;
+                    redetectStartedAtRef.current = 0;
+                    dispatch({ type: "CHECK_PLAYER", payload: { players } });
+                  } else {
+                    if (redetectStartedAtRef.current === 0) {
+                      redetectStartedAtRef.current = Date.now();
+                    }
+                    if (
+                      Date.now() - redetectStartedAtRef.current >=
+                      ACCOUNT_VERIFY_DELAY_MS
+                    ) {
+                      // Toujours absent après le délai → réellement plus dans la partie
+                      needsRedetectionRef.current = false;
+                      redetectStartedAtRef.current = 0;
+                      dispatch({ type: "CHECK_PLAYER", payload: { players } });
+                    }
+                    // sinon : on garde needsRedetectionRef à true et on retente
+                  }
                 }
               }
 

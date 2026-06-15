@@ -133,10 +133,9 @@ export default function PanelManager({
         <button
           className={`manager-gear ${open ? "manager-gear--open" : ""}`}
           onClick={() => {
-            setOpen((v) => {
-              if (!v) onMenuOpen?.(); // signale chaque ouverture (pas la fermeture)
-              return !v;
-            });
+            const willOpen = !open;
+            setOpen(willOpen);
+            if (willOpen) onMenuOpen?.(); // signale chaque ouverture (pas la fermeture)
           }}
           title="Gérer les panneaux"
         >

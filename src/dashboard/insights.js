@@ -204,6 +204,12 @@ export function computeInsights(sessions) {
 
   // ── Meilleur / pire coéquipier ──
   // (matchLog.teammates — présent sur les sessions enregistrées depuis la v2.2)
+  // On classe par winrate AJUSTÉ (shrinkage bayésien vers 50%) plutôt que par
+  // nombre brut de wins/défaites : un mate croisé 2-3 fois est ramené vers la
+  // moyenne et ne peut pas dominer, alors qu'un mate à fort volume garde son
+  // vrai winrate. Il faut aussi un minimum de parties décidées ensemble.
+  const MIN_GAMES_WITH_MATE = 4;
+  const PRIOR_GAMES = 4; // poids du prior (≈ parties fictives à 50%)
   const mates = new Map();
   for (const m of matches) {
     for (const name of m.teammates ?? []) {
@@ -214,27 +220,37 @@ export function computeInsights(sessions) {
       mates.set(name, b);
     }
   }
-  const mateList = [...mates.entries()].map(([name, b]) => ({ name, ...b }));
-  const bestMate = mateList
-    .filter((b) => b.wins >= 2)
-    .sort((a, b) => b.wins - a.wins || winrate(b) - winrate(a))[0];
+  const mateList = [...mates.entries()]
+    .map(([name, b]) => {
+      const decided = b.wins + b.losses; // parties avec un résultat connu
+      const adj = (b.wins + PRIOR_GAMES * 0.5) / (decided + PRIOR_GAMES);
+      return { name, ...b, decided, adj };
+    })
+    .filter((b) => b.decided >= MIN_GAMES_WITH_MATE);
+
+  // Meilleur : meilleur winrate ajusté au-dessus de 50% (à égalité, le plus de
+  // parties l'emporte — winrate plus fiable)
+  const bestMate = [...mateList]
+    .filter((b) => b.adj > 0.5)
+    .sort((a, b) => b.adj - a.adj || b.decided - a.decided)[0];
   if (bestMate) {
     insights.push({
       icon: '🤝', tone: 'up',
       title: 'Meilleur coéquipier',
       value: bestMate.name,
-      detail: `${bestMate.wins} wins ensemble · ${winrate(bestMate)}% de wins sur ${bestMate.count} matchs`,
+      detail: `${winrate(bestMate)}% de wins · ${bestMate.wins}V–${bestMate.losses}D ensemble`,
     });
   }
-  const worstMate = mateList
-    .filter((b) => b.losses >= 2 && b.name !== bestMate?.name)
-    .sort((a, b) => b.losses - a.losses || winrate(a) - winrate(b))[0];
+  // Pire : pire winrate ajusté en dessous de 50%
+  const worstMate = [...mateList]
+    .filter((b) => b.adj < 0.5 && b.name !== bestMate?.name)
+    .sort((a, b) => a.adj - b.adj || b.decided - a.decided)[0];
   if (worstMate) {
     insights.push({
       icon: '🫠', tone: 'down',
       title: 'Coéquipier maudit',
       value: worstMate.name,
-      detail: `${worstMate.losses} défaites ensemble · ${winrate(worstMate)}% de wins sur ${worstMate.count} matchs`,
+      detail: `${winrate(worstMate)}% de wins · ${worstMate.wins}V–${worstMate.losses}D ensemble`,
     });
   }
 
