@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame, platformFromPrimaryId } from '../context/GameContext.jsx';
 
 // Fenêtre de sélection de compte : apparaît quelques secondes en début de
-// partie si aucun compte n'est choisi et que le panneau Live Game est masqué
-// (sinon les matchs ne sont pas comptés dans l'historique). Elle se cache
-// toute seule pour ne pas gêner, et réapparaît à l'ouverture du menu ⚙
-// tant qu'aucun compte n'est sélectionné.
+// partie si aucun compte n'est choisi (ou si le compte stocké n'est pas dans
+// la partie, ex. changement de compte) — sinon les matchs ne sont pas comptés
+// dans l'historique. Elle se cache toute seule pour ne pas gêner, et réapparaît
+// à l'ouverture du menu ⚙ tant qu'aucun compte n'est sélectionné.
 const AUTO_HIDE_MS = 10_000;
 
-export default function AccountPicker({ livePanelVisible, reopenSignal }) {
+export default function AccountPicker({ reopenSignal }) {
   const { state, setPlayer } = useGame();
   const [visible, setVisible] = useState(false);
   const [showCount, setShowCount] = useState(0); // re-déclenche la barre de progression
@@ -16,7 +16,9 @@ export default function AccountPicker({ livePanelVisible, reopenSignal }) {
   const timerRef = useRef(null);
 
   const inGame = state.livePlayers.length > 0;
-  const needsAccount = !state.username && inGame;
+  // Compte requis : aucun compte choisi, OU le compte stocké est absent de la
+  // partie en cours (changement de compte) — même logique que le LivePanel
+  const needsAccount = (!state.username || state.usernameNotInGame) && inGame;
 
   const show = () => {
     setVisible(true);
@@ -25,8 +27,7 @@ export default function AccountPicker({ livePanelVisible, reopenSignal }) {
     timerRef.current = setTimeout(() => setVisible(false), AUTO_HIDE_MS);
   };
 
-  // Auto-affichage en début de partie — une seule fois par partie, et
-  // uniquement si le LivePanel (qui permet déjà la sélection) est masqué
+  // Auto-affichage en début de partie — une seule fois par partie
   useEffect(() => {
     if (!needsAccount) {
       autoShownRef.current = false;
@@ -34,11 +35,11 @@ export default function AccountPicker({ livePanelVisible, reopenSignal }) {
       setVisible(false);
       return;
     }
-    if (livePanelVisible || autoShownRef.current) return;
+    if (autoShownRef.current) return;
     autoShownRef.current = true;
     show();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsAccount, livePanelVisible]);
+  }, [needsAccount]);
 
   // Ré-affichage à l'ouverture du menu ⚙ si toujours aucun compte
   useEffect(() => {
@@ -66,6 +67,9 @@ export default function AccountPicker({ livePanelVisible, reopenSignal }) {
     setVisible(false);
   };
 
+  // Changement de compte : un compte est stocké mais absent de la partie
+  const isSwitch = state.usernameNotInGame && state.username;
+
   return (
     <div className="account-picker">
       <button
@@ -75,9 +79,13 @@ export default function AccountPicker({ livePanelVisible, reopenSignal }) {
       >
         ✕
       </button>
-      <div className="account-picker-title">👤 Qui es-tu ?</div>
+      <div className="account-picker-title">
+        {isSwitch ? '🔄 Changement de compte ?' : '👤 Qui es-tu ?'}
+      </div>
       <div className="account-picker-sub">
-        Choisis ton compte pour que la session soit enregistrée
+        {isSwitch
+          ? <>Compte <strong>{state.username}</strong> introuvable — choisis ton compte</>
+          : 'Choisis ton compte pour que la session soit enregistrée'}
       </div>
       <div className="account-picker-teams">
         {teams.map((team) => {

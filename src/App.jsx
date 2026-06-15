@@ -116,10 +116,7 @@ export default function App() {
         </DraggablePanel>
       )}
 
-      <AccountPicker
-        livePanelVisible={panels.live}
-        reopenSignal={menuOpenCount}
-      />
+      <AccountPicker reopenSignal={menuOpenCount} />
 
       <PanelManager
         key={`manager-${layoutKey}`}
