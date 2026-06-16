@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeInsights } from './insights.js';
+import { getRankProgress, TIER_LABEL_COLORS } from '../utils/rankBands.js';
 import './dashboard.css';
 
 const MODE_META = {
@@ -8,6 +9,22 @@ const MODE_META = {
   standard: { label: '3v3 Standard', short: '3v3', color: '#f472b6' },
 };
 const MODE_ORDER = ['duel', 'double', 'standard'];
+
+// Icônes de rang (electron/assets/{b1,s1,...,gc3,ssl}.png) — bundlées par Vite,
+// indexées par le code court du rang (band.short → 'b1', 'gc3', 'ssl')
+const RANK_ICONS = import.meta.glob('../../electron/assets/*.png', {
+  eager: true, query: '?url', import: 'default',
+});
+function rankIconUrl(short) {
+  if (!short) return null;
+  const file = `/${short.toLowerCase()}.png`;
+  const key = Object.keys(RANK_ICONS).find((k) => k.endsWith(file));
+  return key ? RANK_ICONS[key] : null;
+}
+
+// Limite du graphique de fond des cartes de mode : au-delà, la courbe devient
+// illisible — on ne garde que les N dernières parties
+const MODE_CHART_MAX_POINTS = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -300,12 +317,14 @@ function computeModeStats(sessions) {
   return stats;
 }
 
-function ModeStatCard({ mode, stats, selected, onToggle, bgHistory }) {
+function ModeStatCard({ mode, stats, selected, onToggle, viz }) {
   const meta = MODE_META[mode];
-  const winrate = stats.wins + stats.losses > 0
-    ? Math.round((stats.wins / (stats.wins + stats.losses)) * 100)
-    : null;
+  const decided = stats.wins + stats.losses;
+  const winrate = decided > 0 ? Math.round((stats.wins / decided) * 100) : null;
   const empty = stats.matches === 0 && stats.mmr === 0;
+
+  const rank = viz?.rank;
+  const iconUrl = rank ? rankIconUrl(rank.band.short) : null;
 
   return (
     <div
@@ -331,8 +350,8 @@ function ModeStatCard({ mode, stats, selected, onToggle, bgHistory }) {
         }
       }}
     >
-      {bgHistory && (
-        <SessionChart history={bgHistory} color={meta.color} id={`mode_${mode}`} />
+      {viz?.chartHistory && (
+        <SessionChart history={viz.chartHistory} color={meta.color} id={`mode_${mode}`} />
       )}
       {!empty && <ShareButton buildText={() => shareModeText(mode, stats)} />}
       <div className="dash-mode-card-head">
@@ -343,28 +362,67 @@ function ModeStatCard({ mode, stats, selected, onToggle, bgHistory }) {
         <div className="dash-mode-empty">Aucune donnée</div>
       ) : (
         <>
-          <div className="dash-mode-mmr">
-            <span className={stats.mmr >= 0 ? 'text-up' : 'text-down'}>
-              {fmtDelta(stats.mmr)}
-            </span>
-            <span className="dash-mode-mmr-label">MMR cumulé</span>
-          </div>
-          <div className="dash-mode-row">
-            <span>{stats.matches} matchs</span>
-            <span className="dash-dot">·</span>
-            <span><b className="text-up">{stats.wins}</b> V</span>
-            <span className="dash-dot">·</span>
-            <span><b className="text-down">{stats.losses}</b> D</span>
-          </div>
-          {winrate !== null && (
-            <div className="dash-winrate">
-              <div className="dash-winrate-bar">
-                <div className="dash-winrate-fill" style={{ width: `${winrate}%` }} />
+          {/* Rang + division (un seul compte sélectionné) */}
+          {rank && (
+            <div className="dash-mode-rank">
+              {iconUrl && (
+                <img className="dash-rank-icon" src={iconUrl} alt={rank.band.name} />
+              )}
+              <div className="dash-rank-text">
+                <span
+                  className="dash-rank-name"
+                  style={{ color: TIER_LABEL_COLORS[rank.band.tier] }}
+                >
+                  {rank.band.name}
+                </span>
+                <span className="dash-rank-sub">
+                  Division {rank.division} · {viz.current} MMR
+                </span>
               </div>
-              <span className="dash-winrate-label">{winrate}% winrate</span>
             </div>
           )}
-          <div className="dash-mode-sessions">{stats.sessions} session{stats.sessions > 1 ? 's' : ''}</div>
+
+          {/* Winrate mis en avant + bilan V/D */}
+          {winrate !== null ? (
+            <div className="dash-mode-wr">
+              <span className="dash-mode-wr-pct">{winrate}%</span>
+              <span className="dash-mode-wr-meta">
+                <span className="dash-mode-wr-label">de victoires</span>
+                <span className="dash-mode-wr-record">
+                  <b className="text-up">{stats.wins}V</b>
+                  <span className="dash-score-sep"> – </span>
+                  <b className="text-down">{stats.losses}D</b>
+                </span>
+              </span>
+            </div>
+          ) : (
+            <div className="dash-mode-row">{stats.matches} matchs</div>
+          )}
+          {winrate !== null && (
+            <div className="dash-winrate-bar">
+              <div className="dash-winrate-fill" style={{ width: `${winrate}%` }} />
+            </div>
+          )}
+
+          {/* Infos secondaires */}
+          <div className="dash-mode-foot">
+            <span>{stats.matches} matchs</span>
+            <span className="dash-dot">·</span>
+            <span>{stats.sessions} session{stats.sessions > 1 ? 's' : ''}</span>
+            {viz?.peak != null && (
+              <>
+                <span className="dash-dot">·</span>
+                <span title="MMR le plus haut atteint">▲ {viz.peak}</span>
+              </>
+            )}
+            <span className="dash-dot">·</span>
+            <span
+              className={stats.mmr >= 0 ? 'text-up' : 'text-down'}
+              title="Progression MMR cumulée sur la période"
+            >
+              {fmtDelta(stats.mmr)} MMR
+            </span>
+          </div>
         </>
       )}
     </div>
@@ -523,10 +581,12 @@ export default function Dashboard() {
 
   const globalStats = useMemo(() => computeModeStats(accountSessions), [accountSessions]);
 
-  // Courbe MMR de fond des cartes de mode — seulement quand un seul compte
-  // est affiché (mélanger les ladders de plusieurs comptes n'a pas de sens)
+  // Rang, MMR courant/peak et courbe de fond des cartes de mode — seulement
+  // quand un seul compte est affiché (mélanger les ladders de plusieurs comptes
+  // n'a pas de sens). La courbe est limitée aux dernières parties pour rester
+  // lisible ; le peak reste calculé sur tout l'historique.
   const singleAccount = usernames.length <= 1 || selectedAccounts.size === 1;
-  const modeHistories = useMemo(() => {
+  const modeViz = useMemo(() => {
     if (!singleAccount) return null;
     const sorted = [...accountSessions].sort((a, b) => a.startedAt - b.startedAt);
     const result = {};
@@ -536,7 +596,14 @@ export default function Dashboard() {
         const hist = s.mmrByMode?.[mode]?.history;
         if (hist?.length) concat.push(...hist);
       }
-      result[mode] = concat.length >= 2 ? concat : null;
+      if (concat.length === 0) { result[mode] = null; continue; }
+      const current = concat[concat.length - 1];
+      result[mode] = {
+        current,
+        peak: Math.max(...concat),
+        rank: getRankProgress(current),
+        chartHistory: concat.length >= 2 ? concat.slice(-MODE_CHART_MAX_POINTS) : null,
+      };
     }
     return result;
   }, [accountSessions, singleAccount]);
@@ -672,7 +739,7 @@ export default function Dashboard() {
               stats={globalStats[mode]}
               selected={selectedModes.has(mode)}
               onToggle={toggleMode}
-              bgHistory={modeHistories?.[mode]}
+              viz={modeViz?.[mode]}
             />
           ))}
         </div>
