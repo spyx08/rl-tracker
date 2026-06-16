@@ -27,7 +27,7 @@ RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistique
 
   <img src="screenshots/dashboard.png" alt="Dashboard — stats globales, analyse et historique des sessions" width="720" />
 
-- 📣 **Résumé Discord** — à la fin de chaque session, un récapitulatif complet (MMR, résultats, stats, graphique de progression) est automatiquement posté sur le webhook Discord de ton choix.
+- 📣 **Résumé Discord** — à la fin de chaque session, tu as le choix d'envoyer ou non un récapitulatif complet (MMR, résultats, stats, graphique de progression) sur Discord.
 
   <img src="screenshots/discord_post.png" alt="Résumé de session posté sur Discord" width="480" />
 
