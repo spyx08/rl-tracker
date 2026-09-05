@@ -7,6 +7,7 @@ import LivePanel from './components/LivePanel.jsx';
 import DraggablePanel from './components/DraggablePanel.jsx';
 import PanelManager from './components/PanelManager.jsx';
 import AccountPicker from './components/AccountPicker.jsx';
+import Snackbar from './components/Snackbar.jsx';
 
 const DEFAULT_PANELS = { hud: true, session: true, live: true };
 const POS_KEYS = ['hud', 'session', 'live', 'manager'];
@@ -117,6 +118,8 @@ export default function App() {
       )}
 
       <AccountPicker reopenSignal={menuOpenCount} />
+
+      <Snackbar />
 
       <PanelManager
         key={`manager-${layoutKey}`}

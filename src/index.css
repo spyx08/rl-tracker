@@ -1451,3 +1451,81 @@ body {
   from { width: 0; }
   to   { width: 280px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SNACKBAR — notification passive
+   Purement informatif : pointer-events: none pour ne jamais capter la souris
+   au-dessus du jeu. S'auto-efface (cf. VISIBLE_MS dans Snackbar.jsx).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.snackbar {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10001;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 380px;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-muted);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  animation:
+    snackIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both,
+    snackOut 0.4s ease 5.6s both;
+}
+
+.snackbar--error { border-left-color: var(--loss); }
+
+.snackbar-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  color: var(--text-main);
+  background: var(--text-muted);
+}
+
+.snackbar--error .snackbar-icon { background: var(--loss); }
+
+.snackbar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.snackbar-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* La trace technique : c'est cette ligne qu'on recopie pour remonter un bug */
+.snackbar-detail {
+  font-family: Consolas, "SF Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+@keyframes snackIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes snackOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(8px); }
+}

@@ -85,6 +85,11 @@ const GAMEMODE_DETECT_DELAY_MS = 8000;
 // et déclencherait un reset + re-choix de compte en pleine session.
 const ACCOUNT_VERIFY_DELAY_MS = 8000;
 
+// Fenêtre pendant laquelle un même message de snackbar ne se ré-affiche pas.
+// Le MMR est refetché à chaque fin de match : sans ça, une panne TRN prolongée
+// ferait clignoter la même erreur toute la soirée.
+const NOTICE_COOLDOWN = 5 * 60 * 1000;
+
 // ─── Session snapshot (persistance localStorage) ─────────────────────────────
 // Les stats de session ne vivent que dans le reducer : sans snapshot elles sont
 // perdues sur crash, mise à jour auto (quitAndInstall) ou fermeture non propre.
@@ -460,10 +465,25 @@ const GameContext = createContext(null);
 export function GameProvider({ children }) {
   const [state, dispatch]       = useReducer(gameReducer, initialState);
   const [announcement, setAnnouncement] = useState(null);
+  const [notice, setNotice]             = useState(null);
   const [wsConnected, setWsConnected]   = useState(false);
 
   const announce = useCallback((type, meta = {}) => {
     setAnnouncement({ type, meta, key: Date.now() });
+  }, []);
+
+  // Notification non bloquante (snackbar). La console reçoit TOUJOURS la
+  // trace, même quand l'affichage est étouffé par le cooldown : c'est elle
+  // qu'on relit dans les devtools pour remonter un bug.
+  const lastNoticeRef = useRef({ text: null, at: 0 });
+  const notify = useCallback((type, text, detail = "") => {
+    console.warn(`[${type}] ${text}${detail ? ` — ${detail}` : ""}`);
+    const now = Date.now();
+    const last = lastNoticeRef.current;
+    // Si TRN reste down, l'overlay ne doit pas reclignoter à chaque fin de match
+    if (last.text === text && now - last.at < NOTICE_COOLDOWN) return;
+    lastNoticeRef.current = { text, at: now };
+    setNotice({ type, text, detail, key: now });
   }, []);
 
   // Refs pour que les hooks WS/MMR lisent toujours la valeur courante
@@ -561,10 +581,10 @@ export function GameProvider({ children }) {
     setPlayer,
     setWsConnected,
   );
-  useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username);
+  useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username, notify);
 
   return (
-    <GameContext.Provider value={{ state, announcement, setPlayer, wsConnected }}>
+    <GameContext.Provider value={{ state, announcement, notice, setPlayer, wsConnected }}>
       {children}
     </GameContext.Provider>
   );
@@ -761,7 +781,15 @@ function useRLWebSocket(
 
 // ─── Hook: External MMR ───────────────────────────────────────────────────────
 
-function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, username) {
+// Messages courts par code renvoyé par le proxy local. Le détail technique
+// (code HTTP, compte visé, message du proxy) part dans la ligne du dessous.
+const MMR_ERRORS = {
+  400: "Plateforme non reconnue",
+  404: "Profil Tracker Network introuvable",
+  502: "Tracker Network injoignable",
+};
+
+function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, username, notify) {
   // Ref sur le gameMode pour toujours lire la valeur courante dans le callback async
   const gameModeRef = useRef(gameMode);
   useEffect(() => { gameModeRef.current = gameMode; }, [gameMode]);
@@ -772,7 +800,20 @@ function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, user
     if (!username || !gameModeRef.current) return;
     try {
       const res = await fetch(`http://localhost:3000/api/mmr/${platform}/${username}`);
-      if (!res.ok) throw new Error("Erreur proxy Node");
+
+      if (!res.ok) {
+        // Sur un code connu, le titre dit déjà le pourquoi : inutile de répéter
+        // le message du proxy. Sur un code inattendu, on le joint tel quel.
+        const known = MMR_ERRORS[res.status];
+        const body = known ? null : await res.json().catch(() => null);
+        notify(
+          "error",
+          known ?? "MMR indisponible",
+          `HTTP ${res.status} · ${platform}/${username}${body?.error ? ` · ${body.error}` : ""}`,
+        );
+        return;
+      }
+
       const data = await res.json();
 
       // Utilise le mode de jeu détecté en cours de session pour lire les bons stats.
@@ -790,10 +831,12 @@ function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, user
           rankImg: modeStats.rank?.imageURL ?? "",
         },
       });
-    } catch {
-      /* proxy peut ne pas être actif */
+    } catch (err) {
+      // fetch ne rejette que si le proxy local ne répond pas du tout : serveur
+      // pas encore démarré, ou tombé. Rien de bloquant, on joue sans MMR.
+      notify("error", "Proxy local injoignable", `localhost:3000 · ${err.message}`);
     }
-  }, [dispatch, platformRef, usernameRef]);
+  }, [dispatch, platformRef, usernameRef, notify]);
 
   // Se déclenche au montage, après chaque match, si username change,
   // ET dès que le mode de jeu est détecté (début de partie)
