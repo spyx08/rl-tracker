@@ -46,6 +46,12 @@ body {
   z-index: 100;
 }
 
+/* Le HUD (W / L / streak) épouse son contenu : sans le bloc MMR, la largeur
+   commune des panneaux laissait un grand vide à droite */
+.draggable-panel--hud {
+  min-width: 0;
+}
+
 @keyframes panelEnter {
   from {
     opacity: 0;
@@ -566,7 +572,7 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 10px 16px;
+  padding: 10px 4px;
   border-left: 4px solid var(--accent);
 }
 
@@ -575,7 +581,8 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 0 16px;
+  min-width: 56px;
+  padding: 0 14px;
 }
 
 .hud-block--wide {

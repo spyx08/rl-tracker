@@ -1,5 +1,6 @@
 // Analyse des sessions : tranches horaires, jours, records, fun facts.
-// Tout est calculé à partir du matchLog horodaté et des historiques MMR.
+// Tout est calculé à partir du matchLog horodaté (victoires / défaites) :
+// le MMR n'est plus récupéré.
 
 const SLOTS = [
   { id: 'night',     label: 'Nuit',       hours: '0h–6h',   from: 0,  to: 6 },
@@ -10,60 +11,53 @@ const SLOTS = [
 
 const DAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
-const MIN_MATCHES_PER_BUCKET = 3;
+// Créneaux / jours : il faut assez de parties décidées pour qu'un winrate
+// veuille dire quelque chose
+const MIN_MATCHES_PER_BUCKET = 5;
+// Poids du prior (≈ parties fictives à 50%) du winrate ajusté, comme pour les
+// coéquipiers : un créneau à 4/5 ne doit pas battre un créneau à 30/45
+const PRIOR_GAMES = 4;
 
 function slotOf(ts) {
   const h = new Date(ts).getHours();
   return SLOTS.find((s) => h >= s.from && h < s.to);
 }
 
-function sessionMmrDelta(s) {
-  let total = 0;
-  for (const entry of Object.values(s.mmrByMode ?? {})) {
-    if (!entry?.history?.length) continue;
-    total += entry.history[entry.history.length - 1] - (entry.start ?? entry.history[0]);
-  }
-  return total;
-}
-
-// Liste plate de tous les matchs avec un delta MMR approximé : pour chaque
-// mode d'une session, les écarts successifs de l'historique MMR sont associés
-// dans l'ordre aux matchs de ce mode dans le matchLog.
+// Liste plate de tous les matchs, dans l'ordre chronologique
 function flattenMatches(sessions) {
-  const matches = [];
-  for (const s of sessions) {
-    const log = s.matchLog ?? [];
-    const diffsByMode = {};
-    for (const [mode, entry] of Object.entries(s.mmrByMode ?? {})) {
-      const h = entry?.history ?? [];
-      diffsByMode[mode] = h.slice(1).map((v, i) => v - h[i]);
-    }
-    const usedByMode = {};
-    for (const m of log) {
-      const diffs = diffsByMode[m.mode] ?? [];
-      const idx = usedByMode[m.mode] ?? 0;
-      usedByMode[m.mode] = idx + 1;
-      matches.push({ ...m, delta: idx < diffs.length ? diffs[idx] : null });
-    }
-  }
-  return matches.sort((a, b) => a.ts - b.ts);
+  return sessions.flatMap((s) => s.matchLog ?? []).sort((a, b) => a.ts - b.ts);
 }
 
 function bucketStats(matches, keyFn) {
   const buckets = new Map();
   for (const m of matches) {
+    if (m.result !== 'win' && m.result !== 'loss') continue;
     const key = keyFn(m);
     if (key == null) continue;
-    const b = buckets.get(key) ?? { mmr: 0, wins: 0, losses: 0, count: 0 };
-    if (m.delta != null) b.mmr += m.delta;
+    const b = buckets.get(key) ?? { wins: 0, losses: 0, count: 0 };
     if (m.result === 'win') b.wins++;
-    if (m.result === 'loss') b.losses++;
+    else b.losses++;
     b.count++;
     buckets.set(key, b);
   }
   return [...buckets.entries()]
-    .map(([key, b]) => ({ key, ...b }))
+    .map(([key, b]) => ({
+      key,
+      ...b,
+      adj: (b.wins + PRIOR_GAMES * 0.5) / (b.count + PRIOR_GAMES),
+    }))
     .filter((b) => b.count >= MIN_MATCHES_PER_BUCKET);
+}
+
+// Meilleur bucket au-dessus de 50% ajusté, pire en dessous (jamais le même)
+function bestAndWorst(buckets) {
+  const best = [...buckets]
+    .filter((b) => b.adj > 0.5)
+    .sort((a, b) => b.adj - a.adj || b.count - a.count)[0];
+  const worst = [...buckets]
+    .filter((b) => b.adj < 0.5 && b.key !== best?.key)
+    .sort((a, b) => a.adj - b.adj || b.count - a.count)[0];
+  return { best, worst };
 }
 
 function winrate(b) {
@@ -71,7 +65,8 @@ function winrate(b) {
   return played > 0 ? Math.round((b.wins / played) * 100) : null;
 }
 
-const fmtMmr = (n) => `${n >= 0 ? '+' : ''}${Math.round(n)} MMR`;
+const fmtNet = (n) => (n > 0 ? `+${n}` : `${n}`);
+const fmtRecord = (b) => `${b.wins}V–${b.losses}D`;
 const fmtDate = (ts) =>
   new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
@@ -84,52 +79,46 @@ export function computeInsights(sessions) {
   const insights = [];
 
   // ── Tranches horaires ──
-  const slots = bucketStats(matches, (m) => slotOf(m.ts)?.id);
-  if (slots.length > 0) {
-    const best = [...slots].sort((a, b) => b.mmr - a.mmr)[0];
-    const worst = [...slots].sort((a, b) => a.mmr - b.mmr)[0];
+  {
+    const { best, worst } = bestAndWorst(bucketStats(matches, (m) => slotOf(m.ts)?.id));
     const slotMeta = (id) => SLOTS.find((s) => s.id === id);
-
-    if (best.mmr > 0) {
+    if (best) {
       const meta = slotMeta(best.key);
       insights.push({
         icon: '⏰', tone: 'up',
         title: 'Tranche horaire en or',
         value: `${meta.label} (${meta.hours})`,
-        detail: `${fmtMmr(best.mmr)} · ${best.count} matchs · ${winrate(best)}% de wins`,
+        detail: `${winrate(best)}% de wins · ${fmtRecord(best)}`,
       });
     }
-    if (worst.key !== best.key && worst.mmr < 0) {
+    if (worst) {
       const meta = slotMeta(worst.key);
       insights.push({
         icon: '😴', tone: 'down',
         title: 'Tranche à éviter',
         value: `${meta.label} (${meta.hours})`,
-        detail: `${fmtMmr(worst.mmr)} · ${worst.count} matchs · ${winrate(worst)}% de wins`,
+        detail: `${winrate(worst)}% de wins · ${fmtRecord(worst)}`,
       });
     }
   }
 
   // ── Jours de la semaine ──
-  const days = bucketStats(matches, (m) => new Date(m.ts).getDay());
-  if (days.length > 0) {
-    const best = [...days].sort((a, b) => b.mmr - a.mmr)[0];
-    const worst = [...days].sort((a, b) => a.mmr - b.mmr)[0];
-
-    if (best.mmr > 0) {
+  {
+    const { best, worst } = bestAndWorst(bucketStats(matches, (m) => new Date(m.ts).getDay()));
+    if (best) {
       insights.push({
         icon: '📅', tone: 'up',
         title: 'Ton meilleur jour',
         value: DAYS[best.key],
-        detail: `${fmtMmr(best.mmr)} · ${winrate(best)}% de wins sur ${best.count} matchs`,
+        detail: `${winrate(best)}% de wins · ${fmtRecord(best)}`,
       });
     }
-    if (worst.key !== best.key && worst.mmr < 0) {
+    if (worst) {
       insights.push({
         icon: '🙃', tone: 'down',
         title: 'Jour maudit',
         value: DAYS[worst.key],
-        detail: `${fmtMmr(worst.mmr)} · ${winrate(worst)}% de wins sur ${worst.count} matchs`,
+        detail: `${winrate(worst)}% de wins · ${fmtRecord(worst)}`,
       });
     }
   }
@@ -153,27 +142,27 @@ export function computeInsights(sessions) {
     });
   }
 
-  // ── Meilleure / pire session ──
-  const withDelta = sessions
-    .map((s) => ({ s, delta: sessionMmrDelta(s) }))
-    .filter(({ s }) => (s.totalMatches ?? 0) > 0);
-  if (withDelta.length >= 2) {
-    const best = [...withDelta].sort((a, b) => b.delta - a.delta)[0];
-    const worst = [...withDelta].sort((a, b) => a.delta - b.delta)[0];
-    if (best.delta > 0) {
+  // ── Meilleure / pire session (bilan net victoires − défaites) ──
+  const withNet = sessions
+    .filter((s) => (s.wins ?? 0) + (s.losses ?? 0) > 0)
+    .map((s) => ({ s, net: (s.wins ?? 0) - (s.losses ?? 0) }));
+  if (withNet.length >= 2) {
+    const best = [...withNet].sort((a, b) => b.net - a.net)[0];
+    const worst = [...withNet].sort((a, b) => a.net - b.net)[0];
+    if (best.net > 0) {
       insights.push({
         icon: '🚀', tone: 'up',
         title: 'Meilleure session',
-        value: fmtMmr(best.delta),
-        detail: `Le ${fmtDate(best.s.startedAt)} · ${best.s.wins}V–${best.s.losses}D`,
+        value: `${fmtNet(best.net)} (${best.s.wins}V–${best.s.losses}D)`,
+        detail: `Le ${fmtDate(best.s.startedAt)} · ${winrate(best.s)}% de wins`,
       });
     }
-    if (worst.s.id !== best.s.id && worst.delta < 0) {
+    if (worst.s.id !== best.s.id && worst.net < 0) {
       insights.push({
         icon: '💀', tone: 'down',
         title: 'Session cauchemar',
-        value: fmtMmr(worst.delta),
-        detail: `Le ${fmtDate(worst.s.startedAt)} · ${worst.s.wins}V–${worst.s.losses}D`,
+        value: `${fmtNet(worst.net)} (${worst.s.wins}V–${worst.s.losses}D)`,
+        detail: `Le ${fmtDate(worst.s.startedAt)} · ${winrate(worst.s)}% de wins`,
       });
     }
   }
@@ -209,7 +198,6 @@ export function computeInsights(sessions) {
   // moyenne et ne peut pas dominer, alors qu'un mate à fort volume garde son
   // vrai winrate. Il faut aussi un minimum de parties décidées ensemble.
   const MIN_GAMES_WITH_MATE = 4;
-  const PRIOR_GAMES = 4; // poids du prior (≈ parties fictives à 50%)
   const mates = new Map();
   for (const m of matches) {
     for (const name of m.teammates ?? []) {

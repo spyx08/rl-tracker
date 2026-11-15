@@ -57,7 +57,7 @@ export default function DraggablePanel({ panelId, title, defaultPos, editMode, o
 
   return (
     <div
-      className={`draggable-panel ${editMode ? 'draggable-panel--edit' : ''}`}
+      className={`draggable-panel draggable-panel--${panelId} ${editMode ? 'draggable-panel--edit' : ''}`}
       style={{ left: pos.x, top: pos.y }}
     >
       {editMode && (
