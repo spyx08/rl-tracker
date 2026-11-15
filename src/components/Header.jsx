@@ -1,4 +1,4 @@
-import { useGame } from "../context/GameContext.jsx";
+import { MMR_ENABLED, useGame } from "../context/GameContext.jsx";
 import { getRankProgress, TIER_LABEL_COLORS } from "../utils/rankBands.js";
 
 export default function Header() {
@@ -29,19 +29,23 @@ export default function Header() {
         </span>
       </div>
 
-      <div className="hud-sep" />
+      {MMR_ENABLED && (
+        <>
+          <div className="hud-sep" />
 
-      <div className="hud-block hud-block--wide">
-        <span className="hud-label">MMR</span>
-        <span className="hud-value hud-mmr-row">
-          {rankImg && <img src={rankImg} className="hud-rank-img" alt="" />}
-          <span>{username ? currentMMR || "—" : "—"}</span>
-          {sessionDiff !== null && (
-            <span className={`hud-delta ${deltaClass}`}>{deltaSign}{sessionDiff}</span>
-          )}
-        </span>
-        {prog && <RankProgress prog={prog} startMMR={startMMR} />}
-      </div>
+          <div className="hud-block hud-block--wide">
+            <span className="hud-label">MMR</span>
+            <span className="hud-value hud-mmr-row">
+              {rankImg && <img src={rankImg} className="hud-rank-img" alt="" />}
+              <span>{username ? currentMMR || "—" : "—"}</span>
+              {sessionDiff !== null && (
+                <span className={`hud-delta ${deltaClass}`}>{deltaSign}{sessionDiff}</span>
+              )}
+            </span>
+            {prog && <RankProgress prog={prog} startMMR={startMMR} />}
+          </div>
+        </>
+      )}
 
       <div className="hud-sep" />
 

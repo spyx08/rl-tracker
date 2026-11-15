@@ -26,7 +26,7 @@ const TRN_BASE = "https://api.tracker.gg/api/v2/rocket-league/standard/profile";
 //      Windows (TLS Schannel) passe, lui — d'où l'appel en sous-processus.
 const CURL_BIN =
   process.platform === "win32"
-    ? path.join(process.env.SystemRoot || "C:\Windows", "System32", "curl.exe")
+    ? path.join(process.env.SystemRoot || "C:\\Windows", "System32", "curl.exe")
     : "curl";
 
 const BROWSER_HEADERS = {

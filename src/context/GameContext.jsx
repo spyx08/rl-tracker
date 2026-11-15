@@ -581,7 +581,7 @@ export function GameProvider({ children }) {
     setPlayer,
     setWsConnected,
   );
-  useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username, notify);
+  useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username, notify, MMR_ENABLED);
 
   return (
     <GameContext.Provider value={{ state, announcement, notice, setPlayer, wsConnected }}>
@@ -781,6 +781,11 @@ function useRLWebSocket(
 
 // ─── Hook: External MMR ───────────────────────────────────────────────────────
 
+// Désactivé : Tracker Network bloque désormais tout accès automatisé
+// (challenge Cloudflare). L'overlay se limite aux wins/losses et aux stats
+// de match du bridge. Repasser à true si un accès officiel est obtenu.
+export const MMR_ENABLED = false;
+
 // Messages courts par code renvoyé par le proxy local. Le détail technique
 // (code HTTP, compte visé, message du proxy) part dans la ligne du dessous.
 const MMR_ERRORS = {
@@ -789,7 +794,7 @@ const MMR_ERRORS = {
   502: "Tracker Network injoignable",
 };
 
-function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, username, notify) {
+function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, username, notify, enabled) {
   // Ref sur le gameMode pour toujours lire la valeur courante dans le callback async
   const gameModeRef = useRef(gameMode);
   useEffect(() => { gameModeRef.current = gameMode; }, [gameMode]);
@@ -841,6 +846,6 @@ function useMMR(dispatch, platformRef, usernameRef, gameMode, totalMatches, user
   // Se déclenche au montage, après chaque match, si username change,
   // ET dès que le mode de jeu est détecté (début de partie)
   useEffect(() => {
-    fetchMMR();
-  }, [fetchMMR, totalMatches, username, gameMode]);
+    if (enabled) fetchMMR();
+  }, [enabled, fetchMMR, totalMatches, username, gameMode]);
 }

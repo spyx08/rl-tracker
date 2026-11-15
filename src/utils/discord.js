@@ -214,15 +214,14 @@ export async function sendSessionSummary(state) {
 
   const embed = {
     title: `🎮 Session terminée — ${username} (${gameModeLabel})`,
-    color: sessionDelta >= 0 ? 0x57f287 : 0xed4245,
+    // Sans MMR (fetch TRN désactivé), la couleur suit le bilan V/D
+    color: (startMMR != null ? sessionDelta >= 0 : wins >= losses) ? 0x57f287 : 0xed4245,
     thumbnail: rankImg ? { url: rankImg } : undefined,
     ...(chartBlob ? { image: { url: "attachment://mmr_chart.png" } } : {}),
     fields: [
-      {
-        name: "📊 MMR",
-        value: `${mmrStr}\n${rank ?? ""}`,
-        inline: false,
-      },
+      ...(startMMR != null
+        ? [{ name: "📊 MMR", value: `${mmrStr}\n${rank ?? ""}`, inline: false }]
+        : []),
       {
         name: "📈 Résultats",
         value: `**${wins}V** / **${losses}D**  •  Streak : ${streakStr}`,

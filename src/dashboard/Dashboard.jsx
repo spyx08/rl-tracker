@@ -28,6 +28,12 @@ const MODE_CHART_MAX_POINTS = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Les sessions jouées sans MMR (fetch TRN désactivé) n'ont pas d'historique :
+// on n'affiche alors aucun delta plutôt qu'un « +0 MMR » trompeur
+function hasMmr(modeEntry) {
+  return (modeEntry?.history?.length ?? 0) > 0;
+}
+
 function mmrDelta(modeEntry) {
   if (!modeEntry?.history?.length) return 0;
   const start = modeEntry.start ?? modeEntry.history[0];
@@ -193,7 +199,7 @@ function shareModeText(mode, stats) {
     : null;
   return [
     `🎮 **${meta.label}** — stats RL Tracker`,
-    `📊 MMR cumulé : **${fmtDelta(stats.mmr)}**`,
+    ...(stats.hasMmr ? [`📊 MMR cumulé : **${fmtDelta(stats.mmr)}**`] : []),
     `⚔️ ${stats.matches} matchs · **${stats.wins}V** / **${stats.losses}D**${winrate !== null ? ` · ${winrate}% de winrate` : ''}`,
     `📅 ${stats.sessions} session${stats.sessions > 1 ? 's' : ''}`,
   ].join('\n');
@@ -219,6 +225,7 @@ function shareSessionText(session) {
     `🏁 **${session.wins}V – ${session.losses}D**${winrate !== null ? ` (${winrate}% de winrate)` : ''}`,
   ];
   const modeLine = modes
+    .filter((m) => hasMmr(session.mmrByMode?.[m]))
     .map((m) => `${MODE_META[m].short} **${fmtDelta(mmrDelta(session.mmrByMode?.[m]))} MMR**`)
     .join(' · ');
   if (modeLine) lines.push(`📊 ${modeLine}`);
@@ -295,7 +302,7 @@ function SessionChart({ history, color, id, topPad = 15, bottomPad = 2 }) {
 function computeModeStats(sessions) {
   const stats = {};
   for (const mode of MODE_ORDER) {
-    stats[mode] = { matches: 0, wins: 0, losses: 0, mmr: 0, sessions: 0 };
+    stats[mode] = { matches: 0, wins: 0, losses: 0, mmr: 0, hasMmr: false, sessions: 0 };
   }
   for (const s of sessions) {
     const seen = new Set();
@@ -310,6 +317,7 @@ function computeModeStats(sessions) {
     for (const [mode, entry] of Object.entries(s.mmrByMode ?? {})) {
       if (!stats[mode]) continue;
       stats[mode].mmr += mmrDelta(entry);
+      if (hasMmr(entry)) stats[mode].hasMmr = true;
       seen.add(mode);
     }
     seen.forEach((mode) => { stats[mode].sessions += 1; });
@@ -415,13 +423,17 @@ function ModeStatCard({ mode, stats, selected, onToggle, viz }) {
                 <span title="MMR le plus haut atteint">▲ {viz.peak}</span>
               </>
             )}
-            <span className="dash-dot">·</span>
-            <span
-              className={stats.mmr >= 0 ? 'text-up' : 'text-down'}
-              title="Progression MMR cumulée sur la période"
-            >
-              {fmtDelta(stats.mmr)} MMR
-            </span>
+            {stats.hasMmr && (
+              <>
+                <span className="dash-dot">·</span>
+                <span
+                  className={stats.mmr >= 0 ? 'text-up' : 'text-down'}
+                  title="Progression MMR cumulée sur la période"
+                >
+                  {fmtDelta(stats.mmr)} MMR
+                </span>
+              </>
+            )}
           </div>
         </>
       )}
@@ -479,11 +491,14 @@ function SessionCard({ session }) {
       <div className="dash-session-modes">
         {modes.map((mode) => {
           const meta = MODE_META[mode];
-          const delta = mmrDelta(session.mmrByMode?.[mode]);
+          const entry = session.mmrByMode?.[mode];
+          const delta = mmrDelta(entry);
           return (
             <span key={mode} className="dash-mode-tag" style={{ '--mode-color': meta.color }}>
               {meta.short}
-              <b className={delta >= 0 ? 'text-up' : 'text-down'}>{fmtDelta(delta)}</b>
+              {hasMmr(entry) && (
+                <b className={delta >= 0 ? 'text-up' : 'text-down'}>{fmtDelta(delta)}</b>
+              )}
             </span>
           );
         })}
