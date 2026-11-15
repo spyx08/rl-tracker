@@ -1,4 +1,4 @@
-import { useGame } from '../context/GameContext.jsx';
+import { useGame, platformFromPrimaryId } from '../context/GameContext.jsx';
 
 export default function LivePanel() {
   const { state } = useGame();
@@ -7,7 +7,8 @@ export default function LivePanel() {
   const { usernameNotInGame } = state;
   const hasData = livePlayers.length > 0 && liveTeams.length > 0;
   const sortedTeams = [...liveTeams].sort((a, b) => a.TeamNum - b.TeamNum);
-  const needsSetup = (!username || usernameNotInGame) && hasData;
+  // Sélection manuelle : secours quand le compte n'a pas pu être lu dans le Launch.log
+  const needsSetup = !state.logPlayer && (!username || usernameNotInGame) && hasData;
 
   return (
     <div className="panel live-game-panel">
@@ -83,7 +84,8 @@ function ScoreHeader({ teams, myTeamNum, username }) {
       <div className={`score-team score-team--right ${isMy1 ? 'score-team--mine' : ''}`} style={{ '--team-color': c1 }}>
         {isMy1 && <span className="score-mine-badge">MON ÉQUIPE</span>}
         <span className="score-team-name">{t1.Name || 'TEAM 1'}</span>
-        {username && (
+        {/* Compte détecté automatiquement : pas de changement manuel */}
+        {username && !state.logPlayer && (
           <button
             className="reset-player-btn"
             title="Changer de joueur"
@@ -122,17 +124,10 @@ function PlayerCard({ player, teamColor, username, setupMode }) {
   const { setPlayer } = useGame();
   const isMe = player.Name === username;
 
-  const platformFromPrimaryId = (primaryId) => {
-    if (!primaryId) return 'epic';
-    const prefix = primaryId.split('|')[0].toLowerCase();
-    const map = { epic: 'epic', steam: 'steam', ps4: 'psn', ps5: 'psn', psn: 'psn', xbox: 'xbl', xbl: 'xbl', switch: 'switch' };
-    return map[prefix] ?? 'epic';
-  };
-
   const handleIdentify = () => {
     if (!setupMode) return;
     const platform = platformFromPrimaryId(player.PrimaryId);
-    setPlayer(player.Name, platform);
+    setPlayer(player.Name, platform, player.PrimaryId ?? null);
     console.log(`👤 Joueur sélectionné manuellement : ${player.Name} (${platform})`);
   };
 

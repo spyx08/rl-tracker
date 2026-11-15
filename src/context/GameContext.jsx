@@ -26,41 +26,6 @@ export function platformFromPrimaryId(primaryId) {
   return map[prefix] ?? "epic";
 }
 
-// Tente de trouver le joueur local dans une UpdateState.
-// Retourne { name, platform } ou null.
-function detectLocalPlayer(gameData) {
-  const players = gameData.Players ?? [];
-
-  // 1. Champ dédié sur un joueur — plusieurs nommages possibles selon la version du plugin
-  const local = players.find(
-    (p) =>
-      p.bLocalPlayer === true ||
-      p.isLocalPlayer === true ||
-      p.IsLocalPlayer === true,
-  );
-  if (local) {
-    return {
-      name: local.Name,
-      platform: platformFromPrimaryId(local.PrimaryId),
-    };
-  }
-
-  // 2. Pointeur root vers le joueur local (ex: { "LocalPlayer": "Spyx08" } ou { "me": "Spyx08" })
-  const rootName =
-    gameData.LocalPlayer ?? gameData.local_player ?? gameData.me ?? null;
-  if (rootName) {
-    const p = players.find(
-      (pl) => pl.Name === rootName || pl.PrimaryId === rootName,
-    );
-    if (p)
-      return { name: p.Name, platform: platformFromPrimaryId(p.PrimaryId) };
-    if (typeof rootName === "string")
-      return { name: rootName, platform: "epic" };
-  }
-
-  return null;
-}
-
 // Sépare les noms des coéquipiers / adversaires — stockés dans le matchLog
 // pour la recherche du dashboard et les insights "meilleur/pire coéquipier"
 function splitTeams(players, username, myTeamNum) {
@@ -79,7 +44,8 @@ function splitTeams(players, username, myTeamNum) {
 // rejoignent progressivement, sans délai un 3v3 s'affiche d'abord en 1v1/2v2
 const GAMEMODE_DETECT_DELAY_MS = 8000;
 
-// Délai avant de conclure qu'un compte stocké est absent de la partie. Le
+// Mode secours (Launch.log introuvable) : délai avant de conclure qu'un
+// compte stocké est absent de la partie. Le
 // roster se remplit progressivement : sans ce délai, un UpdateState initial
 // où le joueur n'est pas encore chargé le ferait passer pour "compte changé"
 // et déclencherait un reset + re-choix de compte en pleine session.
@@ -154,6 +120,7 @@ function loadSessionSnapshot(username) {
 
 const savedUsername = localStorage.getItem("rl_username") ?? null;
 const savedPlatform = localStorage.getItem("rl_platform") ?? "epic";
+const savedPrimaryId = localStorage.getItem("rl_primary_id") ?? null;
 
 function newSessionId() {
   return `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -176,6 +143,11 @@ const initialState = {
   // Joueur détecté (null = pas encore identifié)
   username: savedUsername,
   platform: savedPlatform,
+  primaryId: savedPrimaryId,
+  // Compte lu dans le Launch.log du jeu ({ name, primaryId }) — source de
+  // vérité quand il est disponible ; null = sélection manuelle en secours.
+  // Jamais persisté : renvoyé par le serveur à chaque connexion.
+  logPlayer: null,
   usernameNotInGame: false, // true si le username stocké n'est pas trouvé dans la partie en cours
 
   wins: 0,
@@ -226,6 +198,7 @@ function gameReducer(state, action) {
     case "SET_PLAYER":
       return {
         ...state,
+        primaryId: action.payload.primaryId ?? null,
         // Changement de compte = nouvelle session dans l'historique
         sessionId: newSessionId(),
         sessionStartedAt: Date.now(),
@@ -251,10 +224,13 @@ function gameReducer(state, action) {
         totalDemolished: 0,
       };
 
-    // Même compte re-confirmé avec une plateforme différente : on met à jour
-    // la plateforme SANS toucher aux stats de session
-    case "SET_PLATFORM":
-      return { ...state, platform: action.payload };
+    case "LOG_PLAYER":
+      return { ...state, logPlayer: action.payload, usernameNotInGame: false };
+
+    // Même compte (même PrimaryId) renommé : on suit le nouveau pseudo SANS
+    // démarrer une nouvelle session
+    case "RENAME_PLAYER":
+      return { ...state, username: action.payload };
 
     case "MATCH_RESET": {
       // Partie quittée avant l'event MatchEnded (ex: forfait puis quit immédiat) :
@@ -486,8 +462,16 @@ export function GameProvider({ children }) {
     setNotice({ type, text, detail, key: now });
   }, []);
 
+  // Confirmation courte (compte détecté…) : pas de cooldown, chaque lancement
+  // du jeu doit la réafficher
+  const toast = useCallback((text, detail = "") => {
+    setNotice({ type: "success", text, detail, key: Date.now(), duration: 2000 });
+  }, []);
+
   // Refs pour que les hooks WS/MMR lisent toujours la valeur courante
   const usernameRef = useRef(state.username);
+  const primaryIdRef = useRef(state.primaryId);
+  const logPlayerRef = useRef(state.logPlayer);
   const platformRef = useRef(state.platform);
   const myTeamRef = useRef(state.myCurrentTeamNum);
   useEffect(() => {
@@ -496,6 +480,12 @@ export function GameProvider({ children }) {
   useEffect(() => {
     platformRef.current = state.platform;
   }, [state.platform]);
+  useEffect(() => {
+    primaryIdRef.current = state.primaryId;
+  }, [state.primaryId]);
+  useEffect(() => {
+    logPlayerRef.current = state.logPlayer;
+  }, [state.logPlayer]);
   useEffect(() => {
     myTeamRef.current = state.myCurrentTeamNum;
   }, [state.myCurrentTeamNum]);
@@ -556,19 +546,25 @@ export function GameProvider({ children }) {
     state.totalDemolished,
   ]);
 
-  const setPlayer = useCallback((username, platform) => {
+  const setPlayer = useCallback((username, platform, primaryId = null) => {
     // Changement de compte = nouvelle session : le snapshot de l'ancienne ne
     // doit pas être restauré au prochain démarrage
     clearSessionSnapshot();
     if (username) {
       localStorage.setItem("rl_username", username);
       localStorage.setItem("rl_platform", platform ?? "epic");
+      if (primaryId) localStorage.setItem("rl_primary_id", primaryId);
+      else localStorage.removeItem("rl_primary_id");
     } else {
       // Réinitialisation : supprime les clés pour ne pas stocker le string "null"
       localStorage.removeItem("rl_username");
       localStorage.removeItem("rl_platform");
+      localStorage.removeItem("rl_primary_id");
     }
-    dispatch({ type: "SET_PLAYER", payload: { username: username ?? null, platform: platform ?? "epic" } });
+    dispatch({
+      type: "SET_PLAYER",
+      payload: { username: username ?? null, platform: platform ?? "epic", primaryId },
+    });
   }, []);
 
   useRLWebSocket(
@@ -576,10 +572,12 @@ export function GameProvider({ children }) {
     announce,
     state.lastPlayers,
     usernameRef,
-    platformRef,
+    primaryIdRef,
+    logPlayerRef,
     myTeamRef,
     setPlayer,
     setWsConnected,
+    toast,
   );
   useMMR(dispatch, platformRef, usernameRef, state.gameMode, state.totalMatches, state.username, notify, MMR_ENABLED);
 
@@ -601,17 +599,20 @@ function useRLWebSocket(
   announce,
   lastPlayers,
   usernameRef,
-  platformRef,
+  primaryIdRef,
+  logPlayerRef,
   myTeamRef,
   setPlayer,
   setWsConnected,
+  toast,
 ) {
   const lastPlayersRef = useRef(lastPlayers);
   useEffect(() => {
     lastPlayersRef.current = lastPlayers;
   }, [lastPlayers]);
 
-  // Armé à true à chaque nouveau match pour relancer la détection même si un username est déjà stocké
+  // Mode secours (pas de Launch.log) : armé à true à chaque nouveau match pour
+  // vérifier que le compte stocké est bien dans la partie
   const needsRedetectionRef = useRef(true);
   // Horodatage du 1er UpdateState où le compte stocké est introuvable : sert à
   // tolérer le remplissage progressif du roster avant de conclure "compte absent"
@@ -644,6 +645,36 @@ function useRLWebSocket(
           }
 
           switch (payload.Event) {
+            // Compte connecté au jeu, lu par le serveur dans le Launch.log
+            case "LocalPlayer": {
+              const name = gameData?.Name;
+              const primaryId = gameData?.PrimaryId ?? null;
+              if (!name) break;
+              const sameAccount = primaryId && primaryIdRef.current
+                ? primaryId === primaryIdRef.current
+                : name === usernameRef.current;
+              if (!sameAccount) {
+                console.log(`🔄 Compte connecté : ${usernameRef.current ?? "aucun"} → ${name}`);
+                // Nouveau compte → nouvelle session via SET_PLAYER
+                setPlayer(name, platformFromPrimaryId(primaryId), primaryId);
+              } else {
+                if (name !== usernameRef.current) {
+                  localStorage.setItem("rl_username", name);
+                  dispatch({ type: "RENAME_PLAYER", payload: name });
+                }
+                if (primaryId && primaryId !== primaryIdRef.current) {
+                  // Compte choisi à la main avant la v2.4.2 : on complète son id
+                  localStorage.setItem("rl_primary_id", primaryId);
+                  primaryIdRef.current = primaryId;
+                }
+              }
+              logPlayerRef.current = { name, primaryId };
+              // Confirme au joueur que le tracker est prêt et sur quel compte
+              toast(`Compte détecté : ${name}`, "La session sera enregistrée sur ce compte");
+              dispatch({ type: "LOG_PLAYER", payload: { name, primaryId } });
+              break;
+            }
+
             case "MatchCreated":
             case "MatchDestroyed":
               dispatch({ type: "MATCH_RESET" });
@@ -659,39 +690,16 @@ function useRLWebSocket(
               const teams = gameData.Game?.Teams ?? null;
               const game = gameData.Game ?? {};
 
-              // Détection / vérification du compte au début de chaque match.
+              // Mode secours uniquement (Launch.log introuvable) : on vérifie
+              // au début de chaque match que le compte stocké est dans la partie.
               // Tolérant au remplissage progressif du roster : on ne conclut
-              // "compte absent" qu'après ACCOUNT_VERIFY_DELAY_MS, sinon un
-              // joueur pas encore chargé déclencherait à tort un reset de session.
-              if (needsRedetectionRef.current) {
-                const detected = detectLocalPlayer(gameData);
-
-                if (detected) {
-                  // Champ explicite trouvé dans l'event — source fiable
-                  needsRedetectionRef.current = false;
-                  redetectStartedAtRef.current = 0;
-                  if (detected.name !== usernameRef.current) {
-                    console.log(
-                      `🔄 Changement de compte détecté : ${usernameRef.current} → ${detected.name} (${detected.platform})`,
-                    );
-                    // Nouveau compte → reset complet de la session via SET_PLAYER
-                    setPlayer(detected.name, detected.platform);
-                  } else {
-                    console.log(
-                      `🎮 Joueur local confirmé : ${detected.name} (${detected.platform})`,
-                    );
-                    // Même compte : surtout NE PAS repasser par SET_PLAYER, qui
-                    // remettrait toutes les stats de session à zéro à chaque match
-                    if (detected.platform !== platformRef.current) {
-                      localStorage.setItem("rl_platform", detected.platform);
-                      dispatch({ type: "SET_PLATFORM", payload: detected.platform });
-                    }
-                  }
-                } else if (!usernameRef.current) {
+              // "compte absent" qu'après ACCOUNT_VERIFY_DELAY_MS.
+              if (!logPlayerRef.current && needsRedetectionRef.current) {
+                if (!usernameRef.current) {
                   // Aucun champ auto-détectable et pas d'username stocké → UI de sélection
                   needsRedetectionRef.current = false;
                   redetectStartedAtRef.current = 0;
-                  console.log("⚠️ Impossible de détecter le joueur local automatiquement");
+                  console.log("⚠️ Compte non détecté (Launch.log introuvable) : sélection manuelle");
                 } else {
                   // Username stocké, pas de bLocalPlayer : on vérifie sa présence.
                   // Le roster se remplit progressivement, donc tant que le joueur
@@ -776,7 +784,7 @@ function useRLWebSocket(
       dead = true;
       ws?.close();
     };
-  }, [dispatch, announce, setPlayer]);
+  }, [dispatch, announce, setPlayer, toast]);
 }
 
 // ─── Hook: External MMR ───────────────────────────────────────────────────────

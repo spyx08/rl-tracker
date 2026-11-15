@@ -1505,6 +1505,9 @@ body {
 
 .snackbar--error .snackbar-icon { background: var(--loss); }
 
+.snackbar--success { border-left-color: var(--win); }
+.snackbar--success .snackbar-icon { background: var(--win); color: #0b1220; }
+
 .snackbar-body {
   display: flex;
   flex-direction: column;

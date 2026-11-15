@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame, platformFromPrimaryId } from '../context/GameContext.jsx';
 
-// Fenêtre de sélection de compte : apparaît quelques secondes en début de
+// Fenêtre de sélection de compte — SECOURS uniquement : le compte est normalement
+// détecté via le Launch.log du jeu (event LocalPlayer). Si le log est
+// introuvable, elle apparaît quelques secondes en début de
 // partie si aucun compte n'est choisi (ou si le compte stocké n'est pas dans
 // la partie, ex. changement de compte) — sinon les matchs ne sont pas comptés
 // dans l'historique. Elle se cache toute seule pour ne pas gêner, et réapparaît
@@ -18,7 +20,8 @@ export default function AccountPicker({ reopenSignal }) {
   const inGame = state.livePlayers.length > 0;
   // Compte requis : aucun compte choisi, OU le compte stocké est absent de la
   // partie en cours (changement de compte) — même logique que le LivePanel
-  const needsAccount = (!state.username || state.usernameNotInGame) && inGame;
+  const needsAccount =
+    !state.logPlayer && (!state.username || state.usernameNotInGame) && inGame;
 
   const show = () => {
     setVisible(true);
@@ -63,7 +66,7 @@ export default function AccountPicker({ reopenSignal }) {
   });
 
   const pick = (p) => {
-    setPlayer(p.Name, platformFromPrimaryId(p.PrimaryId));
+    setPlayer(p.Name, platformFromPrimaryId(p.PrimaryId), p.PrimaryId ?? null);
     setVisible(false);
   };
 

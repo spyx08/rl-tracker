@@ -99,7 +99,9 @@ function startBackendServer() {
     stdio: "pipe",
     serviceName: "RL Overlay Server",
     cwd: serverDir,
-    env: { ...process.env },
+    // Dossier Documents réel (peut être redirigé vers OneDrive) : le serveur y
+    // lit le Launch.log de Rocket League pour détecter le compte connecté
+    env: { ...process.env, RL_DOCUMENTS_DIR: app.getPath("documents") },
   });
 
   serverProcess.stdout?.on("data", (d) => writeLog(d.toString()));

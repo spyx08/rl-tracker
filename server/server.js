@@ -206,13 +206,98 @@ app.get("/api/mmr/:platform/:username", async (req, res) => {
 const wss = new WebSocket.Server({ port: WS_PORT });
 let obsClients = [];
 
+function broadcast(message) {
+  const json = JSON.stringify(message);
+  obsClients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) client.send(json);
+  });
+}
+
 wss.on("connection", (ws) => {
   console.log("📺 Overlay HTML connecté au bridge !");
   obsClients.push(ws);
+  // Le compte connecté est connu avant que l'overlay ne se connecte
+  if (localPlayer) ws.send(JSON.stringify(localPlayerEvent()));
   ws.on("close", () => {
     obsClients = obsClients.filter((c) => c !== ws);
   });
 });
+
+// --- 3. COMPTE CONNECTÉ (Launch.log de Rocket League) ---
+// L'API Stats n'indique pas quel joueur est le joueur local. Le jeu, lui,
+// journalise la connexion du compte principal à chaque lancement (et à chaque
+// changement de compte) :
+//   Party: HandleLocalPlayerLoginStatusChanged PlayerName=Spyx08
+//          PlayerID=Epic|<id>|0 LoginStatus=LS_LoggedIn IsPrimary=True
+// On suit ce fichier et on pousse le compte à l'overlay (event "LocalPlayer").
+const os = require("os");
+const fs = require("fs");
+
+const LOG_POLL_MS = 3000;
+const LOGIN_RE =
+  /HandleLocalPlayerLoginStatusChanged PlayerName=(.*?) PlayerID=(\S+) LoginStatus=LS_LoggedIn IsPrimary=True/g;
+
+const launchLogPath = path.join(
+  process.env.RL_DOCUMENTS_DIR || path.join(os.homedir(), "Documents"),
+  "My Games", "Rocket League", "TAGame", "Logs", "Launch.log",
+);
+
+let localPlayer = null; // { name, primaryId }
+let logOffset = 0;
+let logTail = ""; // dernière ligne incomplète
+
+function localPlayerEvent() {
+  return {
+    Event: "LocalPlayer",
+    Data: { Name: localPlayer.name, PrimaryId: localPlayer.primaryId },
+  };
+}
+
+function scanLaunchLog() {
+  let size;
+  try {
+    size = fs.statSync(launchLogPath).size;
+  } catch {
+    return; // jeu jamais lancé, ou dossier Documents introuvable
+  }
+  // Fichier plus petit qu'avant : le jeu a été relancé (Launch.log réécrit)
+  if (size < logOffset) {
+    logOffset = 0;
+    logTail = "";
+  }
+  if (size === logOffset) return;
+
+  let chunk;
+  try {
+    const fd = fs.openSync(launchLogPath, "r");
+    const buf = Buffer.alloc(size - logOffset);
+    fs.readSync(fd, buf, 0, buf.length, logOffset);
+    fs.closeSync(fd);
+    chunk = buf.toString("utf8");
+  } catch {
+    return; // fichier verrouillé un instant par le jeu : on réessaiera
+  }
+  logOffset = size;
+
+  const text = logTail + chunk;
+  const cut = text.lastIndexOf("\n");
+  logTail = cut >= 0 ? text.slice(cut + 1) : text;
+
+  let found = null;
+  for (const m of (cut >= 0 ? text.slice(0, cut) : "").matchAll(LOGIN_RE)) {
+    found = { name: m[1].trim(), primaryId: m[2] };
+  }
+  // Chaque nouvelle ligne de connexion (= lancement du jeu) est renvoyée, même
+  // compte compris : l'overlay confirme alors au joueur que le tracker est prêt
+  if (!found) return;
+
+  localPlayer = found;
+  console.log(`👤 Compte Rocket League connecté : ${found.name} (${found.primaryId.split("|")[0]})`);
+  broadcast(localPlayerEvent());
+}
+
+scanLaunchLog();
+setInterval(scanLaunchLog, LOG_POLL_MS);
 
 // On connecte Node au jeu via un socket TCP brut
 function connectToRL() {
