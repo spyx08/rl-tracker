@@ -1,23 +1,39 @@
-import { RANK_BANDS, TIER_FILLS, TIER_LABEL_COLORS } from "./rankBands.js";
-
 const _WEBHOOK_BASE = "https://discord.com/api/webhooks/1513983362463698984/";
 const DEFAULT_WEBHOOK = import.meta.env.VITE_DISCORD_WEBHOOK_KEY
   ? `${_WEBHOOK_BASE}${import.meta.env.VITE_DISCORD_WEBHOOK_KEY}`
   : null;
+
+const MODE_LABELS = { duel: "1v1", double: "2v2", standard: "3v3" };
+const MODE_ORDER = ["duel", "double", "standard"];
+
+const WIN_COLOR = "#4ade80";
+const LOSS_COLOR = "#f87171";
 
 function avg(total, denom) {
   if (!denom) return "0.0";
   return (total / denom).toFixed(1);
 }
 
-// ─── Canvas chart (pour pièce jointe Discord) ──────────────────────────────
+const fmtNet = (n) => (n > 0 ? `+${n}` : `${n}`);
 
-function buildChartBlob(mmrHistory) {
-  if (!mmrHistory || mmrHistory.length < 2) return Promise.resolve(null);
+// Matchs décidés (victoire ou défaite) dans l'ordre de la session
+function decidedMatches(matchLog) {
+  return (matchLog ?? []).filter((m) => m.result === "win" || m.result === "loss");
+}
+
+// ─── Canvas chart (pour pièce jointe Discord) ──────────────────────────────
+// Bilan net cumulé de la session : +1 par victoire, −1 par défaite, en partant
+// de 0. Chaque point est coloré selon le résultat du match.
+
+function buildChartBlob(matches) {
+  if (matches.length < 2) return Promise.resolve(null);
+
+  const curve = [0];
+  for (const m of matches) curve.push(curve[curve.length - 1] + (m.result === "win" ? 1 : -1));
 
   const W = 900,
     H = 220;
-  const PAD = { t: 24, r: 20, b: 32, l: 58 };
+  const PAD = { t: 24, r: 20, b: 32, l: 46 };
   const cW = W - PAD.l - PAD.r;
   const cH = H - PAD.t - PAD.b;
 
@@ -30,114 +46,74 @@ function buildChartBlob(mmrHistory) {
   ctx.fillStyle = "#0d1126";
   ctx.fillRect(0, 0, W, H);
 
-  // Plage MMR
-  const lo = Math.min(...mmrHistory);
-  const hi = Math.max(...mmrHistory);
-  const spread = Math.max(40, hi - lo);
-  const center = (lo + hi) / 2;
-  const mmrMin = center - spread * 0.65;
-  const mmrMax = center + spread * 0.65;
-  const mmrRange = mmrMax - mmrMin;
+  // Plage Y : toujours symétrique autour de 0 pour que le signe du bilan se
+  // lise d'un coup d'œil (au moins ±3 pour ne pas écraser une petite session)
+  const maxAbs = Math.max(3, ...curve.map((v) => Math.abs(v)));
+  const yMax = maxAbs + 1;
+  const yMin = -yMax;
 
-  const xOf = (i) => PAD.l + (i / Math.max(mmrHistory.length - 1, 1)) * cW;
-  const yOf = (v) => PAD.t + cH - ((v - mmrMin) / mmrRange) * cH;
+  const xOf = (i) => PAD.l + (i / (curve.length - 1)) * cW;
+  const yOf = (v) => PAD.t + cH - ((v - yMin) / (yMax - yMin)) * cH;
+  const y0 = yOf(0);
 
-  const clampY = (y) => Math.max(PAD.t, Math.min(PAD.t + cH, y));
+  // ── Zones positive / négative ──
+  ctx.fillStyle = "rgba(74,222,128,0.05)";
+  ctx.fillRect(PAD.l, PAD.t, cW, y0 - PAD.t);
+  ctx.fillStyle = "rgba(248,113,113,0.05)";
+  ctx.fillRect(PAD.l, y0, cW, PAD.t + cH - y0);
 
-  // ── Bandes de rang ──
-  const bands = RANK_BANDS.filter((b) => b.max >= mmrMin && b.min <= mmrMax);
-  for (const b of bands) {
-    const y1 = clampY(yOf(b.max));
-    const y2 = clampY(yOf(b.min));
-    const bH = y2 - y1;
-    if (bH <= 0) continue;
-    ctx.fillStyle = TIER_FILLS[b.tier][b.tierIdx % 2];
-    ctx.fillRect(PAD.l, y1, cW, bH);
-    // Séparateur de rang
-    ctx.strokeStyle = "rgba(255,255,255,0.12)";
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(PAD.l, y1);
-    ctx.lineTo(PAD.l + cW, y1);
-    ctx.stroke();
-    if (bH > 13) {
-      ctx.fillStyle = TIER_LABEL_COLORS[b.tier];
-      ctx.font = "bold 12px sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(b.short, PAD.l + 8, y1 + bH / 2 + 4);
-    }
-  }
-
-  // ── Lignes de graduation ──
-  const rawStep = mmrRange / 4;
-  const tickStep = Math.ceil(rawStep / 10) * 10;
-  const firstTick = Math.ceil(mmrMin / tickStep) * tickStep;
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  // ── Graduations (entiers) ──
+  const tickStep = Math.max(1, Math.ceil(yMax / 4));
   ctx.lineWidth = 0.5;
-  ctx.setLineDash([3, 4]);
-  for (let v = firstTick; v <= mmrMax; v += tickStep) {
+  ctx.font = "11px monospace";
+  ctx.textAlign = "right";
+  for (let v = -Math.floor(yMax / tickStep) * tickStep; v <= yMax; v += tickStep) {
     const y = yOf(v);
-    if (y < PAD.t || y > PAD.t + cH) continue;
+    ctx.strokeStyle = v === 0 ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)";
+    ctx.setLineDash(v === 0 ? [] : [3, 4]);
     ctx.beginPath();
     ctx.moveTo(PAD.l, y);
     ctx.lineTo(PAD.l + cW, y);
     ctx.stroke();
     ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = "11px monospace";
-    ctx.textAlign = "right";
-    ctx.fillText(String(Math.round(v)), PAD.l - 6, y + 4);
+    ctx.fillText(fmtNet(v), PAD.l - 6, y + 4);
   }
   ctx.setLineDash([]);
 
-  // ── Zone colorée sous la courbe ──
-  ctx.save();
+  // ── Zone colorée entre la courbe et 0 ──
+  const finalColor = curve[curve.length - 1] >= 0 ? "74,222,128" : "248,113,113";
   ctx.beginPath();
-  ctx.rect(PAD.l, PAD.t, cW, cH);
-  ctx.clip();
-  ctx.beginPath();
-  ctx.moveTo(xOf(0), PAD.t + cH);
-  mmrHistory.forEach((v, i) => ctx.lineTo(xOf(i), yOf(v)));
-  ctx.lineTo(xOf(mmrHistory.length - 1), PAD.t + cH);
+  ctx.moveTo(xOf(0), y0);
+  curve.forEach((v, i) => ctx.lineTo(xOf(i), yOf(v)));
+  ctx.lineTo(xOf(curve.length - 1), y0);
   ctx.closePath();
-  const grad = ctx.createLinearGradient(0, PAD.t, 0, PAD.t + cH);
-  grad.addColorStop(0, "rgba(249,115,22,0.30)");
-  grad.addColorStop(1, "rgba(249,115,22,0)");
-  ctx.fillStyle = grad;
+  ctx.fillStyle = `rgba(${finalColor},0.18)`;
   ctx.fill();
-  ctx.restore();
 
-  // ── Courbe MMR ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(PAD.l, PAD.t, cW, cH);
-  ctx.clip();
-  ctx.beginPath();
-  mmrHistory.forEach((v, i) => {
-    if (i === 0) ctx.moveTo(xOf(0), yOf(v));
-    else ctx.lineTo(xOf(i), yOf(v));
-  });
-  ctx.strokeStyle = "#f97316";
+  // ── Courbe : chaque segment prend la couleur du match qu'il représente ──
   ctx.lineWidth = 2.5;
   ctx.lineJoin = "round";
-  ctx.stroke();
-  ctx.restore();
-
-  // ── Points de match (vert = gain, rouge = perte) ──
-  mmrHistory.forEach((v, i) => {
-    const isLast = i === mmrHistory.length - 1;
-    const color =
-      i === 0 ? "#f97316" : v >= mmrHistory[i - 1] ? "#4ade80" : "#f87171";
+  ctx.lineCap = "round";
+  for (let i = 1; i < curve.length; i++) {
+    ctx.strokeStyle = matches[i - 1].result === "win" ? WIN_COLOR : LOSS_COLOR;
     ctx.beginPath();
-    ctx.arc(xOf(i), clampY(yOf(v)), isLast ? 5 : 3, 0, Math.PI * 2);
+    ctx.moveTo(xOf(i - 1), yOf(curve[i - 1]));
+    ctx.lineTo(xOf(i), yOf(curve[i]));
+    ctx.stroke();
+  }
+
+  // ── Points de match (vert = victoire, rouge = défaite) ──
+  curve.forEach((v, i) => {
+    const isLast = i === curve.length - 1;
+    const color = i === 0 ? "rgba(255,255,255,0.6)" : matches[i - 1].result === "win" ? WIN_COLOR : LOSS_COLOR;
+    ctx.beginPath();
+    ctx.arc(xOf(i), yOf(v), isLast ? 5 : 3.5, 0, Math.PI * 2);
     ctx.fillStyle = color;
-    ctx.globalAlpha = isLast ? 1 : 0.85;
     ctx.fill();
-    ctx.globalAlpha = 1;
     if (isLast) {
       // Anneau blanc autour du dernier point pour le mettre en valeur
       ctx.beginPath();
-      ctx.arc(xOf(i), clampY(yOf(v)), 7, 0, Math.PI * 2);
+      ctx.arc(xOf(i), yOf(v), 7, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255,255,255,0.7)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
@@ -154,11 +130,11 @@ function buildChartBlob(mmrHistory) {
   ctx.stroke();
 
   // ── Labels X (numéros de match) ──
-  const labelStep = Math.max(1, Math.floor((mmrHistory.length - 1) / 10));
+  const labelStep = Math.max(1, Math.floor((curve.length - 1) / 10));
   ctx.fillStyle = "rgba(255,255,255,0.35)";
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
-  for (let i = 0; i < mmrHistory.length; i += labelStep) {
+  for (let i = 0; i < curve.length; i += labelStep) {
     ctx.fillText(String(i), xOf(i), PAD.t + cH + 20);
   }
 
@@ -176,55 +152,71 @@ export async function sendSessionSummary(state) {
 
   const {
     username,
-    rank,
-    rankImg,
-    startMMR,
-    currentMMR,
     wins,
     losses,
     streak,
+    matchLog,
     totalMatches,
     totalGoals,
     totalAssists,
     totalSaves,
     totalDemolished,
     totalMVPs,
-    mmrHistory,
     gameMode,
   } = state;
 
-  const gameModeLabel =
-    gameMode === "duel" ? "1v1" : gameMode === "double" ? "2v2" : "3v3";
-
   if (!username || totalMatches === 0) return;
 
-  // Delta de session = MMR final − MMR de départ (pas le delta du dernier match)
-  const sessionDelta = startMMR != null ? currentMMR - startMMR : 0;
-  const deltaSign = sessionDelta >= 0 ? "+" : "";
-  const mmrStr =
-    startMMR != null
-      ? `${startMMR} → **${currentMMR}** (${deltaSign}${sessionDelta})`
-      : `${currentMMR}`;
+  const matches = decidedMatches(matchLog);
+
+  // Modes réellement joués pendant la session (repli : mode courant)
+  const modes = MODE_ORDER.filter((m) => matches.some((x) => x.mode === m));
+  const modesLabel = modes.length
+    ? modes.map((m) => MODE_LABELS[m]).join(" · ")
+    : MODE_LABELS[gameMode] ?? "3v3";
+
+  const decided = wins + losses;
+  const winrate = decided > 0 ? Math.round((wins / decided) * 100) : null;
+  const net = wins - losses;
+
+  let bestStreak = 0;
+  let cur = 0;
+  for (const m of matches) {
+    if (m.result === "win") bestStreak = Math.max(bestStreak, ++cur);
+    else cur = 0;
+  }
 
   const streakStr =
     streak > 0 ? `+${streak} 🔥` : streak < 0 ? `${streak} 🧊` : "—";
 
+  const resultLines = [
+    `**${wins}V** / **${losses}D**${winrate !== null ? `  •  **${winrate}%** de victoires` : ""}  •  Bilan **${fmtNet(net)}**`,
+    `Streak actuelle : ${streakStr}${bestStreak >= 2 ? `  •  Meilleure série : **${bestStreak}** 🔥` : ""}`,
+  ];
+  // Détail par mode quand la session en mélange plusieurs
+  if (modes.length > 1) {
+    resultLines.push(
+      modes
+        .map((m) => {
+          const w = matches.filter((x) => x.mode === m && x.result === "win").length;
+          const l = matches.filter((x) => x.mode === m && x.result === "loss").length;
+          return `${MODE_LABELS[m]} **${w}V–${l}D**`;
+        })
+        .join("  •  "),
+    );
+  }
+
   // Le chart sera attaché comme image de l'embed
-  const chartBlob = await buildChartBlob(mmrHistory).catch(() => null);
+  const chartBlob = await buildChartBlob(matches).catch(() => null);
 
   const embed = {
-    title: `🎮 Session terminée — ${username} (${gameModeLabel})`,
-    // Sans MMR (fetch TRN désactivé), la couleur suit le bilan V/D
-    color: (startMMR != null ? sessionDelta >= 0 : wins >= losses) ? 0x57f287 : 0xed4245,
-    thumbnail: rankImg ? { url: rankImg } : undefined,
-    ...(chartBlob ? { image: { url: "attachment://mmr_chart.png" } } : {}),
+    title: `🎮 Session terminée — ${username} (${modesLabel})`,
+    color: net >= 0 ? 0x57f287 : 0xed4245,
+    ...(chartBlob ? { image: { url: "attachment://winloss_chart.png" } } : {}),
     fields: [
-      ...(startMMR != null
-        ? [{ name: "📊 MMR", value: `${mmrStr}\n${rank ?? ""}`, inline: false }]
-        : []),
       {
         name: "📈 Résultats",
-        value: `**${wins}V** / **${losses}D**  •  Streak : ${streakStr}`,
+        value: resultLines.join("\n"),
         inline: false,
       },
       {
@@ -254,7 +246,7 @@ export async function sendSessionSummary(state) {
       },
     ],
     footer: {
-      text: `${totalMatches} match${totalMatches > 1 ? "s" : ""} joués`,
+      text: `${totalMatches} match${totalMatches > 1 ? "s" : ""} joué${totalMatches > 1 ? "s" : ""}`,
     },
     timestamp: new Date().toISOString(),
   };
@@ -268,7 +260,7 @@ export async function sendSessionSummary(state) {
   if (chartBlob) {
     const form = new FormData();
     form.append("payload_json", JSON.stringify(payload));
-    form.append("files[0]", chartBlob, "mmr_chart.png");
+    form.append("files[0]", chartBlob, "winloss_chart.png");
     await fetch(url, { method: "POST", body: form });
   } else {
     await fetch(url, {

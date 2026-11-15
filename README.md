@@ -11,11 +11,11 @@ RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistique
 
 ### Ce que ça fait
 
-- 📊 **HUD** — visualise ton MMR, tes wins/losses et ta streak en un coup d'œil, avec une barre de progression dans ta division actuelle (points restants jusqu'à la division suivante et repère de ton MMR de début de session)
+- 📊 **HUD** — compact, il affiche tes wins, tes losses et ta streak de la session en un coup d'œil
 
   <img src="screenshots/header_panel.png" alt="HUD panel" width="480" />
 
-- 📈 **Session Stats** — suis ta progression sur l'ensemble de ta session de jeu
+- 📈 **Session Stats** — buts, passes, arrêts, démos subies et titres de MVP sur l'ensemble de ta session, avec la moyenne par match
 
   <img src="screenshots/ingame_session_panel.png" alt="Session Stats panel" width="480" />
 
@@ -23,15 +23,19 @@ RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistique
 
   <img src="screenshots/ingame_goal_animation.png" alt="Live Game — animation but" width="480" />
 
-- 📅 **Dashboard** — toutes tes sessions sont enregistrées en local. Une fenêtre dédiée (accessible depuis le menu ⚙) affiche tes stats globales par mode de jeu (1v1 / 2v2 / 3v3), une analyse de tes données (meilleure tranche horaire, jour le plus rentable, séries record, détecteur de tilt…) et l'historique complet de tes sessions sous forme de timeline, navigable mois par mois avec recherche.
+- 📅 **Dashboard** — toutes tes sessions sont enregistrées en local. Une fenêtre dédiée (accessible depuis le menu ⚙) affiche tes stats globales par mode de jeu (1v1 / 2v2 / 3v3 : winrate, bilan victoires − défaites, meilleure série, courbe de bilan), une analyse de tes données (meilleure tranche horaire, meilleur jour, meilleure et pire session, séries record, meilleur coéquipier, détecteur de tilt…) et l'historique complet de tes sessions sous forme de timeline, navigable mois par mois avec recherche.
 
   <img src="screenshots/dashboard.png" alt="Dashboard — stats globales, analyse et historique des sessions" width="720" />
 
-- 📣 **Résumé Discord** — à la fin de chaque session, tu as le choix d'envoyer ou non un récapitulatif complet (MMR, résultats, stats, graphique de progression) sur Discord.
+- 📣 **Résumé Discord** — à la fin de chaque session, tu as le choix d'envoyer ou non un récapitulatif complet sur Discord : victoires / défaites, winrate, bilan, streak et meilleure série (avec le détail par mode), buts, passes, arrêts, MVP, et un graphique de l'évolution de ton bilan match par match.
 
   <img src="screenshots/discord_post.png" alt="Résumé de session posté sur Discord" width="480" />
 
 ### Comment ça marche
+
+Tout est lu **en local**, directement depuis le jeu : l'app s'appuie sur l'API Stats officielle de Rocket League pour les parties et sur les logs du jeu pour savoir quel compte est connecté. Aucun service externe, aucun mod, rien d'injecté dans le jeu.
+
+- 👤 **Détection automatique du compte** — au lancement du jeu, l'app reconnaît le compte connecté (Epic ou Steam) et te le confirme par une petite notification. Si tu changes de compte, une nouvelle session démarre toute seule : plus besoin de sélectionner ton pseudo.
 
 L'application se superpose à Rocket League de manière totalement transparente : tous tes clics et mouvements de souris passent directement au jeu, sans aucun impact sur tes inputs ou tes performances. En **mode édition**, tu peux activer/désactiver chaque panneau individuellement et les repositionner librement à l'écran. Une fois en jeu, l'overlay est verrouillé et invisible pour ta souris.
 
@@ -121,8 +125,14 @@ L'application vérifie les mises à jour automatiquement au démarrage. Quand un
 **L'overlay ne s'affiche pas par-dessus le jeu**
 → Vérifie que Rocket League est bien en mode **Fenêtre sans bordure** (pas Plein écran).
 
-**L'overlay s'affiche mais ne reçoit aucune stat (buts, MMR…)**
+**L'overlay s'affiche mais ne reçoit aucune stat (buts, victoires…)**
 → Ouvre le menu ⚙ et vérifie la ligne de statut **Config RL StatsAPI**. Si elle indique une erreur, relance l'app (et valide l'invite UAC si elle apparaît), ou fais la modification manuellement (voir [Configurer Rocket League](#activer-les-statistiques-en-temps-réel)).
+
+**Le compte n'est pas détecté automatiquement (sélecteur « Qui es-tu ? »)**
+→ L'app lit le fichier `DocumentsMy GamesRocket LeagueTAGameLogsLaunch.log`. S'il est introuvable (jeu jamais lancé, dossier Documents déplacé), le sélecteur manuel prend le relais : clique sur ton pseudo en début de partie.
+
+**Pourquoi le MMR n'est plus affiché ?**
+→ Le MMR venait de Tracker Network, qui bloque désormais tout accès automatisé. Le jeu ne fournit pas le MMR en local, donc l'app suit uniquement les victoires, défaites et stats de match. Tes sessions déjà enregistrées restent dans l'historique.
 
 **Le serveur apparaît comme déconnecté (point rouge dans le menu ⚙)**
 → Attends quelques secondes au démarrage, le serveur interne met 1 à 2 secondes à démarrer.
