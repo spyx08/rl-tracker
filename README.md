@@ -3,6 +3,9 @@
   <h1>RL Tracker — Overlay Rocket League</h1>
 </div>
 
+> [!NOTE]
+> **Le suivi du MMR a été retiré.** L'API de Tracker Network qui fournissait le MMR et le rang bloque désormais tout accès automatisé : depuis la v2.4.0, RL Tracker suit uniquement tes victoires, défaites et stats de match. Certaines images ci-dessous montrent encore le MMR, le rang ou un graphique MMR : n'en tiens pas compte, elles seront mises à jour prochainement.
+
 RL Tracker est un overlay desktop pour Rocket League qui affiche tes statistiques en temps réel directement par-dessus le jeu, sans jamais interrompre ta partie — et qui garde l'historique de toutes tes sessions pour analyser ta progression.
 
 <div align="center">
